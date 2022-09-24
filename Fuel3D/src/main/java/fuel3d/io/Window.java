@@ -1,0 +1,73 @@
+package fuel3d.io;
+
+import fuel3d.Fuel3D;
+import org.joml.Vector2i;
+import org.joml.Vector2ic;
+import org.lwjgl.system.MemoryStack;
+import static org.lwjgl.vulkan.KHRSurface.*;
+import static org.lwjgl.vulkan.VK10.*;
+
+import java.nio.IntBuffer;
+import java.nio.LongBuffer;
+
+import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.glfw.GLFWVulkan.*;
+import static org.lwjgl.system.MemoryUtil.*;
+
+public class Window {
+    private final long window;
+    private final long surface;
+    private Vector2i size;
+    private String title;
+    private final Logger logger;
+    private final Fuel3D renderer;
+
+    public Window(Vector2ic iSize, String title, Fuel3D renderer) {
+        this.size = new Vector2i(iSize);
+        this.title = title;
+        this.logger = renderer.getLogger();
+        this.renderer = renderer;
+
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            LongBuffer lb = stack.mallocLong(1);
+            IntBuffer ib = stack.mallocInt(1);
+
+            glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+            glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); //TODO: Window resize support
+
+
+            window = glfwCreateWindow(size.x, size.y, title, NULL, NULL);
+            if (window == NULL)
+                logger.error("[Fuel3D] ERROR: Window creation failed!");
+
+            renderer.chErr(glfwCreateWindowSurface(renderer.getInstance(), window, null, lb));
+            surface = lb.get(0);
+
+            renderer.chErr(vkGetPhysicalDeviceSurfaceSupportKHR(renderer.getPhysicalDevice(), renderer.getQueueIndices().present(), surface, ib));
+            if (ib.get(0) != VK_TRUE) {
+                logger.error("Physical device does not support window surfaces, may have been caused by non-supported platform");
+            }
+        }
+    }
+
+    public void destroy() {
+        vkDestroySurfaceKHR(renderer.getInstance(), surface, null);
+        glfwDestroyWindow(window);
+    }
+
+    public boolean windowShouldClose() {
+        return glfwWindowShouldClose(window);
+    }
+
+    public void pollEvents() {
+        glfwPollEvents();
+    }
+
+    public long getSurface() {
+        return surface;
+    }
+
+    public Fuel3D getRenderer() {
+        return renderer;
+    }
+}

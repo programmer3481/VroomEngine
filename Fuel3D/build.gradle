@@ -1,0 +1,34 @@
+plugins {
+    id 'java-library'
+}
+
+project.ext.lwjglVersion = "3.3.1"
+project.ext.jomlVersion = "1.10.4"
+project.ext.lwjglNatives = "natives-windows"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.8.1'
+
+    api platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
+
+    api "org.lwjgl:lwjgl"
+    api "org.lwjgl:lwjgl-assimp"
+    api "org.lwjgl:lwjgl-glfw"
+    api "org.lwjgl:lwjgl-openal"
+    api "org.lwjgl:lwjgl-stb"
+    api "org.lwjgl:lwjgl-vulkan"
+    runtimeOnly "org.lwjgl:lwjgl::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-assimp::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-openal::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-stb::$lwjglNatives"
+    api "org.joml:joml:${jomlVersion}"
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
