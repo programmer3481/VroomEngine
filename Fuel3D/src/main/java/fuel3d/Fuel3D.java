@@ -50,7 +50,7 @@ public class Fuel3D {
     public static final Version VERSION = new Version(1, 0, 0);
     public static final String NAME = "Fuel3D";
 
-    public Fuel3D(Settings settings) { // initWindow should be null
+    public Fuel3D(Settings settings) {
         validate = settings.validate;
         debugger = settings.debugger;
         logger = settings.logger;
