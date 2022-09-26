@@ -1,4 +1,4 @@
-package fuel3d.io;
+package fuel3d;
 
 public class Logger {
     private final MessageFunction messageFunction;
@@ -9,11 +9,11 @@ public class Logger {
         errorString = settings.errorString;
     }
 
-    public void log(MessageType type, String message) {
+    protected void log(MessageType type, String message) {
         messageFunction.run(type, message);
     }
 
-    public void error(String message) {
+    protected void error(String message) {
         throw new IllegalStateException(errorString.get(message));
     }
 

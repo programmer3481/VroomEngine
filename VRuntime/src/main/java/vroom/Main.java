@@ -1,9 +1,9 @@
 package vroom;
 
 import fuel3d.Fuel3D;
-import fuel3d.io.Debugger;
-import fuel3d.io.Logger;
-import fuel3d.io.Window;
+import fuel3d.Debugger;
+import fuel3d.Logger;
+import fuel3d.Window;
 import org.joml.Vector2i;
 
 public class Main {
@@ -42,7 +42,7 @@ public class Main {
         f3dSettings.logger = logger;
         Fuel3D f3d = new Fuel3D(f3dSettings);
 
-        Window window = new Window(new Vector2i(1920, 1080), "Hi", f3d);
+        Window window = new Window(1920, 1080, "Hi", f3d);
         while (!window.windowShouldClose()) {
             window.pollEvents();
         }

@@ -1,7 +1,6 @@
 package fuel3d;
 
-import fuel3d.io.Debugger;
-import fuel3d.io.Logger;
+import org.joml.Vector2ic;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
@@ -16,11 +15,10 @@ import static org.lwjgl.glfw.GLFW.glfwTerminate;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.VK10.*;
 import static org.lwjgl.vulkan.KHRSwapchain.*;
-import static org.lwjgl.vulkan.KHRSurface.*;
 import static org.lwjgl.vulkan.KHRWin32Surface.vkGetPhysicalDeviceWin32PresentationSupportKHR;
 import static org.lwjgl.vulkan.EXTDebugUtils.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
-import static fuel3d.io.Logger.MessageType;
+import static fuel3d.Logger.MessageType;
 
 public class Fuel3D {
     private final VkInstance instance;
@@ -422,7 +420,7 @@ public class Fuel3D {
         return reqExtensions;
     }
 
-    public void chErr(int code) { // return code error checking function
+    protected void chErr(int code) { // return code error checking function
         if (code != 0 && code != 5) logger.error(String.format("Vulkan error [0x%X]", code));
     }
 
@@ -432,11 +430,7 @@ public class Fuel3D {
         return deviceNameList;
     }
 
-    public Debugger getDebugger() {
-        return debugger;
-    }
-
-    public Logger getLogger() {
+    protected Logger getLogger() {
         return logger;
     }
 
@@ -460,15 +454,15 @@ public class Fuel3D {
         return engineVersion;
     }
 
-    public VkInstance getInstance() {
+    protected VkInstance getInstance() {
         return instance;
     }
 
-    public VkPhysicalDevice getPhysicalDevice() {
+    protected VkPhysicalDevice getPhysicalDevice() {
         return physicalDevice;
     }
 
-    public AvailableQueueFamilyIndices getQueueIndices() {
+    protected AvailableQueueFamilyIndices getQueueIndices() {
         return queueIndices;
     }
 
@@ -487,8 +481,15 @@ public class Fuel3D {
     }
     //endregion
 
+    private static class MainWindow extends Window {
+
+        public MainWindow(int width, int height, String title, Fuel3D renderer) {
+            super(width, height, title, renderer);
+        }
+    }
+
     // If index is -1, it is not available
-    public record AvailableQueueFamilyIndices(int graphics, int present) {
+    protected record AvailableQueueFamilyIndices(int graphics, int present) {
         public boolean allAvailable() {
             return graphics >= 0;
         }

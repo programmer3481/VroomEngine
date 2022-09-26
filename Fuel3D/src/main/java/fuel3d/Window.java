@@ -1,6 +1,5 @@
-package fuel3d.io;
+package fuel3d;
 
-import fuel3d.Fuel3D;
 import org.joml.Vector2i;
 import org.joml.Vector2ic;
 import org.lwjgl.system.MemoryStack;
@@ -17,13 +16,13 @@ import static org.lwjgl.system.MemoryUtil.*;
 public class Window {
     private final long window;
     private final long surface;
-    private Vector2i size;
-    private String title;
-    private final Logger logger;
+    protected Vector2i size;
+    protected String title;
+    protected final Logger logger;
     private final Fuel3D renderer;
 
-    public Window(Vector2ic iSize, String title, Fuel3D renderer) {
-        this.size = new Vector2i(iSize);
+    public Window(int width, int height, String title, Fuel3D renderer) {
+        this.size = new Vector2i(width, height);
         this.title = title;
         this.logger = renderer.getLogger();
         this.renderer = renderer;
@@ -63,11 +62,7 @@ public class Window {
         glfwPollEvents();
     }
 
-    public long getSurface() {
+    protected long getSurface() {
         return surface;
-    }
-
-    public Fuel3D getRenderer() {
-        return renderer;
     }
 }

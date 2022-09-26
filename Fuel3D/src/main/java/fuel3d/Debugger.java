@@ -1,4 +1,4 @@
-package fuel3d.io;
+package fuel3d;
 
 
 
