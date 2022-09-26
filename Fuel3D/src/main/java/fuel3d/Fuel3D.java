@@ -1,6 +1,6 @@
 package fuel3d;
 
-import org.joml.Vector2ic;
+import org.joml.Vector2i;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
@@ -10,11 +10,12 @@ import java.nio.LongBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.lwjgl.glfw.GLFW.glfwInit;
-import static org.lwjgl.glfw.GLFW.glfwTerminate;
+import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.system.MemoryUtil.*;
+import static org.lwjgl.vulkan.KHRWin32Surface.VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
 import static org.lwjgl.vulkan.VK10.*;
 import static org.lwjgl.vulkan.KHRSwapchain.*;
+import static org.lwjgl.vulkan.KHRSurface.*;
 import static org.lwjgl.vulkan.KHRWin32Surface.vkGetPhysicalDeviceWin32PresentationSupportKHR;
 import static org.lwjgl.vulkan.EXTDebugUtils.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
@@ -32,12 +33,13 @@ public class Fuel3D {
     private boolean windowsSurface = false;
 
     private List<String> deviceNameList; // TODO: support switching gpu
-    private Debugger debugger;
+    private final Debugger debugger;
     private final Logger logger;
 
-    public final boolean validate; // 'Debug mode'
+    private final boolean validate; // 'Debug mode'
     private final String appName, engineName;
-    public final Version appVersion, engineVersion;
+    private final Version appVersion, engineVersion;
+    private final Window initWindow; // ONLY get right after renderer initialization; CAN BE DESTROYED AT RUNTIME
 
     private final String[] instanceExtensionList = new String[] { // Empty for now
     };
@@ -48,7 +50,7 @@ public class Fuel3D {
     public static final Version VERSION = new Version(1, 0, 0);
     public static final String NAME = "Fuel3D";
 
-    public Fuel3D(Settings settings) {
+    public Fuel3D(Settings settings) { // initWindow should be null
         validate = settings.validate;
         debugger = settings.debugger;
         logger = settings.logger;
@@ -56,6 +58,8 @@ public class Fuel3D {
         appVersion = settings.appVersion;
         engineName = settings.engineName;
         engineVersion = settings.engineVersion;
+        initWindow = new InitWindow(settings.initWindowWidth, settings.initWindowHeight, settings.initWindowTitle, this);
+
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer ib = stack.mallocInt(1);
             LongBuffer lb = stack.mallocLong(1);
@@ -225,18 +229,19 @@ public class Fuel3D {
             // Find surface type (used for determining what function to use for checking physical device queue surface support)
             PointerBuffer glfwReqExtensions = glfwGetRequiredInstanceExtensions();
             for (int i = 0; i < glfwReqExtensions.capacity(); i++) {
-                if (glfwReqExtensions.getStringASCII(i).equals("VK_KHR_win32_surface")) {
+                if (glfwReqExtensions.getStringASCII(i).equals(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)) {
                     windowsSurface = true;
                     logger.log(MessageType.INFO, "Windows platform detected");
                     break;
                 }
             }
-            if (!windowsSurface) {
-                logger.log(MessageType.WARNING, "Unsupported platform, errors may occur");
-            }
 
-            pickPhysicalDevice();
-            createLogicalDevice();
+            //create initWindow surface
+            chErr(glfwCreateWindowSurface(instance, initWindow.window, null, lb));
+            initWindow.surface = lb.get(0);
+
+            pickPhysicalDevice(initWindow.surface);
+            createLogicalDevice(initWindow.surface);
         }
     }
 
@@ -248,9 +253,9 @@ public class Fuel3D {
         vkDestroyInstance(instance, null);
     }
 
-    private void createLogicalDevice() { // Also sets graphicsQueue
+    private void createLogicalDevice(long testSurface) { // Also sets graphicsQueue
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            queueIndices = getQueueFamilyIndices(stack, physicalDevice);
+            queueIndices = getQueueFamilyIndices(stack, physicalDevice, testSurface);
 
             VkDeviceQueueCreateInfo.Buffer deviceQueueInfo = VkDeviceQueueCreateInfo.malloc(queueIndices.graphics == queueIndices.present ? 1 : 2, stack);
             deviceQueueInfo.get(0)
@@ -296,7 +301,7 @@ public class Fuel3D {
         }
     }
 
-    private void pickPhysicalDevice() {
+    private void pickPhysicalDevice(long testSurface) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer ib = stack.mallocInt(1);
 
@@ -313,13 +318,13 @@ public class Fuel3D {
                     VkPhysicalDevice testDevice = new VkPhysicalDevice(availablePhysicalDevices.get(i), instance);
                     vkGetPhysicalDeviceProperties(testDevice, availablePhysicalDevicesProperties.get(i));
 
-                    if (isDeviceSupported(testDevice, availablePhysicalDevicesProperties.get(i))) {
+                    if (isDeviceSupported(testDevice, availablePhysicalDevicesProperties.get(i), testSurface)) {
                         physicalDevices.add(testDevice);
                         deviceNameList.add(availablePhysicalDevicesProperties.get(i).deviceNameString());
                     }
                 }
                 if (physicalDevices.size() > 0){
-                    physicalDevice = physicalDevices.get(0);
+                    physicalDevice = physicalDevices.get(0); // Use the first one TODO: support switching gpus
                     logger.log(MessageType.INFO, "Using GPU: " + availablePhysicalDevicesProperties.get(0).deviceNameString());
                 }
             }
@@ -329,7 +334,7 @@ public class Fuel3D {
         }
     }
 
-    private boolean isDeviceSupported(VkPhysicalDevice physicalDevice, VkPhysicalDeviceProperties properties) {
+    private boolean isDeviceSupported(VkPhysicalDevice physicalDevice, VkPhysicalDeviceProperties properties, long testSurface) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer ib = stack.mallocInt(1);
 
@@ -359,13 +364,13 @@ public class Fuel3D {
                 }
             }
 
-            AvailableQueueFamilyIndices indices = getQueueFamilyIndices(stack, physicalDevice);
+            AvailableQueueFamilyIndices indices = getQueueFamilyIndices(stack, physicalDevice, testSurface);
 
             return indices.allAvailable() && extensionsAllFound;
         }
     }
 
-    private AvailableQueueFamilyIndices getQueueFamilyIndices(MemoryStack stack, VkPhysicalDevice physicalDevice) {
+    private AvailableQueueFamilyIndices getQueueFamilyIndices(MemoryStack stack, VkPhysicalDevice physicalDevice, long testSurface) {
         IntBuffer ib = stack.mallocInt(1);
 
         int graphicsQueue = -1;
@@ -381,13 +386,11 @@ public class Fuel3D {
                     graphicsQueue = i;
                 }
 
-                if (windowsSurface) {
-                    if (vkGetPhysicalDeviceWin32PresentationSupportKHR(physicalDevice, i)) {
+                chErr(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, testSurface, ib));
+                if (ib.get(0) == VK_TRUE) {
+                    if (!windowsSurface || vkGetPhysicalDeviceWin32PresentationSupportKHR(physicalDevice, i)) {
                         presentQueue = i;
                     }
-                }
-                else {
-                    presentQueue = graphicsQueue;
                 }
 
                 if (graphicsQueue >= 0 && presentQueue >= 0) {
@@ -466,6 +469,10 @@ public class Fuel3D {
         return queueIndices;
     }
 
+    public Window getInitWindow() { // ONLY get right after renderer initialization; CAN BE DESTROYED AT RUNTIME
+        return initWindow;
+    }
+
     //endregion
 
     //region init and cleanup
@@ -481,10 +488,19 @@ public class Fuel3D {
     }
     //endregion
 
-    private static class MainWindow extends Window {
+    private static class InitWindow extends Window { // First window to be created('main' window), surface not initialized, used for surface support checking.
+        public InitWindow(int width, int height, String title, Fuel3D renderer) {
+            this.size = new Vector2i(width, height);
+            this.title = title;
+            this.logger = renderer.getLogger();
+            this.renderer = renderer;
 
-        public MainWindow(int width, int height, String title, Fuel3D renderer) {
-            super(width, height, title, renderer);
+            glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+            glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); //TODO: Window resize support
+
+            window = glfwCreateWindow(size.x, size.y, title, NULL, NULL);
+            if (window == NULL)
+                logger.error("[Fuel3D] ERROR: Window creation failed!");
         }
     }
 
@@ -501,8 +517,10 @@ public class Fuel3D {
         public String appName = "App", engineName = "Fuel3D";
         public Version appVersion = new Version(1, 0 ,0), engineVersion = VERSION;
         public Logger logger = new Logger(new Logger.Settings());
-        protected boolean validate = false;
-        protected Debugger debugger = null;
+        private boolean validate = false;
+        private Debugger debugger = null;
+        public int initWindowWidth = 720, initWindowHeight = 480;
+        public String initWindowTitle = "App";
 
         public void enableDebug(Debugger debugger) {
             validate = true;

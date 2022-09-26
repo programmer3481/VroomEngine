@@ -14,12 +14,12 @@ import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.system.MemoryUtil.*;
 
 public class Window {
-    private final long window;
-    private final long surface;
+    protected long window;
+    protected long surface;
     protected Vector2i size;
     protected String title;
-    protected final Logger logger;
-    private final Fuel3D renderer;
+    protected Logger logger;
+    protected Fuel3D renderer;
 
     public Window(int width, int height, String title, Fuel3D renderer) {
         this.size = new Vector2i(width, height);
@@ -44,10 +44,12 @@ public class Window {
 
             renderer.chErr(vkGetPhysicalDeviceSurfaceSupportKHR(renderer.getPhysicalDevice(), renderer.getQueueIndices().present(), surface, ib));
             if (ib.get(0) != VK_TRUE) {
-                logger.error("Physical device does not support window surfaces, may have been caused by non-supported platform");
+                logger.error("Physical device does not support window surfaces");
             }
         }
     }
+
+    protected Window() {}
 
     public void destroy() {
         vkDestroySurfaceKHR(renderer.getInstance(), surface, null);
@@ -64,5 +66,13 @@ public class Window {
 
     protected long getSurface() {
         return surface;
+    }
+
+    public Vector2ic getSize() {
+        return size;
+    }
+
+    public String getTitle() {
+        return title;
     }
 }
