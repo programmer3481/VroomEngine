@@ -20,6 +20,7 @@ public class Window {
     protected String title;
     protected Logger logger;
     protected Fuel3D renderer;
+    private boolean isVisible = false;
 
     public Window(int width, int height, String title, Fuel3D renderer) {
         this.size = new Vector2i(width, height);
@@ -33,6 +34,7 @@ public class Window {
 
             glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
             glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); //TODO: Window resize support
+            glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
 
             window = glfwCreateWindow(size.x, size.y, title, NULL, NULL);
@@ -44,11 +46,12 @@ public class Window {
 
             renderer.chErr(vkGetPhysicalDeviceSurfaceSupportKHR(renderer.getPhysicalDevice(), renderer.getQueueIndices().present(), surface, ib));
             if (ib.get(0) != VK_TRUE) {
-                logger.error("Physical device does not support window surfaces");
+                logger.error("Physical device does not support this window surface");
             }
         }
     }
 
+    //needed for custom constructor in Fuel3D
     protected Window() {}
 
     public void destroy() {
@@ -58,6 +61,20 @@ public class Window {
 
     public boolean windowShouldClose() {
         return glfwWindowShouldClose(window);
+    }
+
+    public void visible(boolean visible) {
+        isVisible = visible;
+        if (isVisible == true) {
+            glfwShowWindow(window);
+        }
+        else {
+            glfwHideWindow(window);
+        }
+    }
+
+    public boolean isVisible() {
+        return isVisible;
     }
 
     public void pollEvents() {

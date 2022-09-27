@@ -339,7 +339,6 @@ public class Fuel3D {
             IntBuffer ib = stack.mallocInt(1);
 
             // Check extension support
-            boolean extensionsAllFound = true;
             chErr(vkEnumerateDeviceExtensionProperties(physicalDevice, (String)null, ib, null));
             if (ib.get(0) > 0) {
                 VkExtensionProperties.Buffer availableDeviceExtensions = VkExtensionProperties.malloc(ib.get(0), stack);
@@ -355,19 +354,41 @@ public class Fuel3D {
                         }
                     }
                     if (!found) {
-                        extensionsAllFound = false;
                         logger.log(MessageType.INFO,
                                 "Cannot find instance extension " + extension +
                                 " on device " + properties.deviceNameString() + ", skipping");
-                        break;
+                        return false;
                     }
                 }
             }
 
-            AvailableQueueFamilyIndices indices = getQueueFamilyIndices(stack, physicalDevice, testSurface);
+            SurfaceInfo sInfo = getSurfaceInfo(stack, physicalDevice, testSurface);
+            boolean swapchainSupported = sInfo.formats.capacity() != 0 && sInfo.presentModes.capacity() != 0;
 
-            return indices.allAvailable() && extensionsAllFound;
+            AvailableQueueFamilyIndices indices = getQueueFamilyIndices(stack, physicalDevice, testSurface);
+            return indices.allAvailable() && swapchainSupported;
         }
+    }
+
+    private SurfaceInfo getSurfaceInfo(MemoryStack stack, VkPhysicalDevice physicalDevice, long testSurface) {
+        IntBuffer ib = stack.mallocInt(1);
+
+        VkSurfaceCapabilitiesKHR capabilities = VkSurfaceCapabilitiesKHR.malloc(stack);
+        chErr(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, testSurface, capabilities));
+
+        chErr(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, testSurface, ib, null));
+        VkSurfaceFormatKHR.Buffer surfaceFormats = VkSurfaceFormatKHR.malloc(ib.get(0), stack);
+        if (ib.get(0) > 0) {
+            vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, testSurface, ib, surfaceFormats);
+        }
+
+        vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, testSurface, ib, null);
+        IntBuffer presentModes = stack.mallocInt(ib.get(0));
+        if (ib.get(0) > 0) {
+            vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, testSurface, ib, presentModes);
+        }
+
+        return new SurfaceInfo(capabilities, surfaceFormats, presentModes);
     }
 
     private AvailableQueueFamilyIndices getQueueFamilyIndices(MemoryStack stack, VkPhysicalDevice physicalDevice, long testSurface) {
@@ -397,10 +418,6 @@ public class Fuel3D {
                     break;
                 }
             }
-        }
-
-        if (graphicsQueue < 0 || presentQueue < 0) {
-            logger.error("Could not find suitable QueueFamily indices");
         }
 
         return new AvailableQueueFamilyIndices(graphicsQueue, presentQueue);
@@ -497,6 +514,7 @@ public class Fuel3D {
 
             glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
             glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); //TODO: Window resize support
+            glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
             window = glfwCreateWindow(size.x, size.y, title, NULL, NULL);
             if (window == NULL)
@@ -507,9 +525,11 @@ public class Fuel3D {
     // If index is -1, it is not available
     protected record AvailableQueueFamilyIndices(int graphics, int present) {
         public boolean allAvailable() {
-            return graphics >= 0;
+            return graphics >= 0 && present >= 0;
         }
     }
+
+    private record SurfaceInfo(VkSurfaceCapabilitiesKHR capabilities, VkSurfaceFormatKHR.Buffer formats, IntBuffer presentModes) { }
 
     public record Version(int major, int minor, int patch) { }
 

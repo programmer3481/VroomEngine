@@ -40,6 +40,8 @@ public class Main {
 
         Window extra = new Window(1280, 720, "Multiple windows go brrr", f3d);
 
+        window.visible(true);
+        extra.visible(true);
         while (!window.windowShouldClose() && !extra.windowShouldClose()) {
             window.pollEvents();
             extra.pollEvents();
