@@ -31,22 +31,19 @@ public class Main {
         Fuel3D.Settings f3dSettings = new Fuel3D.Settings();
         f3dSettings.enableDebug(debugger);
         f3dSettings.logger = logger;
-        f3dSettings.initWindowWidth = 1920;
-        f3dSettings.initWindowHeight = 1080;
-        f3dSettings.initWindowTitle = "Hi";
 
-        Fuel3D f3d = new Fuel3D(f3dSettings);
-        Window window = f3d.getInitWindow();
+        Window mainWindow = new Window(1920, 1080, "hi", null);
+        Fuel3D f3d = new Fuel3D(f3dSettings, mainWindow);
 
         Window extra = new Window(1280, 720, "Multiple windows go brrr", f3d);
 
-        window.visible(true);
+        mainWindow.visible(true);
         extra.visible(true);
-        while (!window.windowShouldClose() && !extra.windowShouldClose()) {
-            window.pollEvents();
+        while (!mainWindow.windowShouldClose() && !extra.windowShouldClose()) {
+            mainWindow.pollEvents();
             extra.pollEvents();
         }
-        window.destroy();
+        mainWindow.destroy();
         extra.destroy();
 
         f3d.destroy();

@@ -23,23 +23,22 @@ import static fuel3d.Logger.MessageType;
 
 public class Fuel3D {
     private final VkInstance instance;
-    private VkPhysicalDevice physicalDevice = null;
+    private VkPhysicalDevice physicalDevice = null; // TODO: support switching gpu
+    private List<String> deviceNameList;
     private VkDevice device = null;
     private AvailableQueueFamilyIndices queueIndices;
     private VkQueue graphicsQueue = null;
     private VkQueue presentQueue = null;
     private List<VkPhysicalDevice> physicalDevices;
     private long debugMessenger;
-    private boolean windowsSurface = false;
+    private String platform;
 
-    private List<String> deviceNameList; // TODO: support switching gpu
     private final Debugger debugger;
     private final Logger logger;
 
     private final boolean validate; // 'Debug mode'
     private final String appName, engineName;
     private final Version appVersion, engineVersion;
-    private final Window initWindow; // ONLY get right after renderer initialization; CAN BE DESTROYED AT RUNTIME
 
     private final String[] instanceExtensionList = new String[] { // Empty for now
     };
@@ -50,7 +49,7 @@ public class Fuel3D {
     public static final Version VERSION = new Version(1, 0, 0);
     public static final String NAME = "Fuel3D";
 
-    public Fuel3D(Settings settings) {
+    public Fuel3D(Settings settings, Window initWindow) {
         validate = settings.validate;
         debugger = settings.debugger;
         logger = settings.logger;
@@ -58,7 +57,6 @@ public class Fuel3D {
         appVersion = settings.appVersion;
         engineName = settings.engineName;
         engineVersion = settings.engineVersion;
-        initWindow = new InitWindow(settings.initWindowWidth, settings.initWindowHeight, settings.initWindowTitle, this);
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer ib = stack.mallocInt(1);
@@ -230,18 +228,19 @@ public class Fuel3D {
             PointerBuffer glfwReqExtensions = glfwGetRequiredInstanceExtensions();
             for (int i = 0; i < glfwReqExtensions.capacity(); i++) {
                 if (glfwReqExtensions.getStringASCII(i).equals(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)) {
-                    windowsSurface = true;
+                    platform = "Windows";
                     logger.log(MessageType.INFO, "Windows platform detected");
                     break;
                 }
             }
 
             //create initWindow surface
-            chErr(glfwCreateWindowSurface(instance, initWindow.window, null, lb));
-            initWindow.surface = lb.get(0);
+            initWindow.initWindow(this);
 
-            pickPhysicalDevice(initWindow.surface);
-            createLogicalDevice(initWindow.surface);
+            pickPhysicalDevice(initWindow.getSurface());
+            createLogicalDevice(initWindow.getSurface());
+
+            initWindow.checkSupport();
         }
     }
 
@@ -409,7 +408,7 @@ public class Fuel3D {
 
                 chErr(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, testSurface, ib));
                 if (ib.get(0) == VK_TRUE) {
-                    if (!windowsSurface || vkGetPhysicalDeviceWin32PresentationSupportKHR(physicalDevice, i)) {
+                    if (!platform.equals("Windows") || vkGetPhysicalDeviceWin32PresentationSupportKHR(physicalDevice, i)) {
                         presentQueue = i;
                     }
                 }
@@ -486,10 +485,6 @@ public class Fuel3D {
         return queueIndices;
     }
 
-    public Window getInitWindow() { // ONLY get right after renderer initialization; CAN BE DESTROYED AT RUNTIME
-        return initWindow;
-    }
-
     //endregion
 
     //region init and cleanup
@@ -504,23 +499,6 @@ public class Fuel3D {
         glfwTerminate();
     }
     //endregion
-
-    private static class InitWindow extends Window { // First window to be created('main' window), surface not initialized, used for surface support checking.
-        public InitWindow(int width, int height, String title, Fuel3D renderer) {
-            this.size = new Vector2i(width, height);
-            this.title = title;
-            this.logger = renderer.getLogger();
-            this.renderer = renderer;
-
-            glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-            glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); //TODO: Window resize support
-            glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-
-            window = glfwCreateWindow(size.x, size.y, title, NULL, NULL);
-            if (window == NULL)
-                logger.error("[Fuel3D] ERROR: Window creation failed!");
-        }
-    }
 
     // If index is -1, it is not available
     protected record AvailableQueueFamilyIndices(int graphics, int present) {
@@ -539,8 +517,6 @@ public class Fuel3D {
         public Logger logger = new Logger(new Logger.Settings());
         private boolean validate = false;
         private Debugger debugger = null;
-        public int initWindowWidth = 720, initWindowHeight = 480;
-        public String initWindowTitle = "App";
 
         public void enableDebug(Debugger debugger) {
             validate = true;

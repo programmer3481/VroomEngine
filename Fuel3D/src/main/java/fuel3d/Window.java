@@ -14,35 +14,49 @@ import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.system.MemoryUtil.*;
 
 public class Window {
-    protected long window;
-    protected long surface;
-    protected Vector2i size;
-    protected String title;
-    protected Logger logger;
-    protected Fuel3D renderer;
+    private long window;
+    private long surface;
+    private int width, height;
+    private String title;
+    private Logger logger;
+    private Fuel3D renderer;
     private boolean isVisible = false;
 
     public Window(int width, int height, String title, Fuel3D renderer) {
-        this.size = new Vector2i(width, height);
+        this.width = width;
+        this.height = height;
         this.title = title;
-        this.logger = renderer.getLogger();
+
+        if (renderer != null) {
+            initWindow(renderer);
+            checkSupport();
+        }
+    }
+
+    protected void initWindow(Fuel3D renderer) {
         this.renderer = renderer;
+        this.logger = renderer.getLogger();
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             LongBuffer lb = stack.mallocLong(1);
-            IntBuffer ib = stack.mallocInt(1);
 
             glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
             glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); //TODO: Window resize support
             glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
 
-            window = glfwCreateWindow(size.x, size.y, title, NULL, NULL);
+            window = glfwCreateWindow(width, height, title, NULL, NULL);
             if (window == NULL)
                 logger.error("[Fuel3D] ERROR: Window creation failed!");
 
             renderer.chErr(glfwCreateWindowSurface(renderer.getInstance(), window, null, lb));
             surface = lb.get(0);
+        }
+    }
+
+    protected void checkSupport() {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            IntBuffer ib = stack.mallocInt(1);
 
             renderer.chErr(vkGetPhysicalDeviceSurfaceSupportKHR(renderer.getPhysicalDevice(), renderer.getQueueIndices().present(), surface, ib));
             if (ib.get(0) != VK_TRUE) {
@@ -50,9 +64,6 @@ public class Window {
             }
         }
     }
-
-    //needed for custom constructor in Fuel3D
-    protected Window() {}
 
     public void destroy() {
         vkDestroySurfaceKHR(renderer.getInstance(), surface, null);
@@ -65,7 +76,7 @@ public class Window {
 
     public void visible(boolean visible) {
         isVisible = visible;
-        if (isVisible == true) {
+        if (isVisible) {
             glfwShowWindow(window);
         }
         else {
@@ -85,8 +96,12 @@ public class Window {
         return surface;
     }
 
-    public Vector2ic getSize() {
-        return size;
+    public int getWidth() {
+        return width;
+    }
+
+    public int getHeight() {
+        return height;
     }
 
     public String getTitle() {
