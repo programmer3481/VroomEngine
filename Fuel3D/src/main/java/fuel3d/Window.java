@@ -1,18 +1,13 @@
 package fuel3d;
 
-import org.joml.Vector2i;
-import org.joml.Vector2ic;
 import org.lwjgl.system.MemoryStack;
-import org.lwjgl.vulkan.VkPhysicalDevice;
-import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
-import org.lwjgl.vulkan.VkSurfaceFormatKHR;
+import org.lwjgl.vulkan.*;
 
 import static org.lwjgl.vulkan.KHRSurface.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
-import java.util.Vector;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
@@ -21,6 +16,7 @@ import static org.lwjgl.system.MemoryUtil.*;
 public class Window {
     private long window;
     private long surface;
+    private KHRSwapchain swapchain;
     private int width, height;
     private String title;
     private Logger logger;
@@ -70,7 +66,7 @@ public class Window {
         }
     }
 
-    protected SurfaceInfo getSurfaceInfo(MemoryStack stack, VkPhysicalDevice physicalDevice) {
+    protected SurfaceInfo querySurfaceInfo(MemoryStack stack, VkPhysicalDevice physicalDevice) {
         IntBuffer ib = stack.mallocInt(1);
 
         VkSurfaceCapabilitiesKHR capabilities = VkSurfaceCapabilitiesKHR.malloc(stack);

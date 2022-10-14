@@ -1,6 +1,5 @@
 package fuel3d;
 
-import org.joml.Vector2i;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
@@ -79,9 +78,8 @@ public class Fuel3D {
 
                         for (String layer : layerSet) {
                             boolean found = false;
-                            for (int i = 0; i  < availableLayers.capacity(); i++) {
-                                availableLayers.position(i);
-                                if (layer.equals(availableLayers.layerNameString())) {
+                            for (VkLayerProperties availableLayer : availableLayers) {
+                                if (layer.equals(availableLayer.layerNameString())) {
                                     found = true;
                                     break;
                                 }
@@ -110,7 +108,7 @@ public class Fuel3D {
             }
 
             // Getting instance extensions
-            PointerBuffer reqInstanceExtensions = getReqInstanceExtensions(stack);
+            PointerBuffer reqInstanceExtensions = queryReqInstanceExtensions(stack);
             chErr(vkEnumerateInstanceExtensionProperties((String)null, ib, null));
             if (ib.get(0) > 0) {
                 VkExtensionProperties.Buffer availableInstanceExtensions = VkExtensionProperties.malloc(ib.get(0), stack);
@@ -119,9 +117,8 @@ public class Fuel3D {
                 boolean allFound = true;
                 for (int i = 0; i < reqInstanceExtensions.capacity(); i++) {
                     boolean found = false;
-                    for (int j = 0; j < availableInstanceExtensions.capacity(); j++) {
-                        availableInstanceExtensions.position(j);
-                        if (reqInstanceExtensions.getStringASCII(i).equals(availableInstanceExtensions.extensionNameString())) {
+                    for (VkExtensionProperties availableInstanceExtension : availableInstanceExtensions) {
+                        if (reqInstanceExtensions.getStringASCII(i).equals(availableInstanceExtension.extensionNameString())) {
                             found = true;
                             break;
                         }
@@ -255,7 +252,7 @@ public class Fuel3D {
 
     private void createLogicalDevice(Window testWindow) { // Also sets graphicsQueue
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            queueIndices = getQueueFamilyIndices(stack, physicalDevice, testWindow);
+            queueIndices = queryQueueFamilyIndices(stack, physicalDevice, testWindow);
 
             VkDeviceQueueCreateInfo.Buffer deviceQueueInfo = VkDeviceQueueCreateInfo.malloc(queueIndices.graphics == queueIndices.present ? 1 : 2, stack);
             deviceQueueInfo.get(0)
@@ -346,8 +343,7 @@ public class Fuel3D {
 
                 for (String extension : deviceExtensionList) {
                     boolean found = false;
-                    for (int i = 0; i < availableDeviceExtensions.capacity(); i++) {
-                        availableDeviceExtensions.position(i);
+                    for (VkExtensionProperties availableDeviceExtension : availableDeviceExtensions) {
                         if (extension.equals(availableDeviceExtensions.extensionNameString())) {
                             found = true;
                             break;
@@ -362,17 +358,17 @@ public class Fuel3D {
                 }
             }
 
-            SurfaceInfo sInfo = testWindow.getSurfaceInfo(stack, physicalDevice);
+            SurfaceInfo sInfo = testWindow.querySurfaceInfo(stack, physicalDevice);
             if (!sInfo.available()) {
                 return false;
             }
 
-            AvailableQueueFamilyIndices indices = getQueueFamilyIndices(stack, physicalDevice, testWindow);
+            AvailableQueueFamilyIndices indices = queryQueueFamilyIndices(stack, physicalDevice, testWindow);
             return indices.allAvailable();
         }
     }
 
-    private AvailableQueueFamilyIndices getQueueFamilyIndices(MemoryStack stack, VkPhysicalDevice physicalDevice, Window testWindow) {
+    private AvailableQueueFamilyIndices queryQueueFamilyIndices(MemoryStack stack, VkPhysicalDevice physicalDevice, Window testWindow) {
         IntBuffer ib = stack.mallocInt(1);
 
         int graphicsQueue = -1;
@@ -417,7 +413,7 @@ public class Fuel3D {
         return new AvailableQueueFamilyIndices(graphicsQueue, presentQueue);
     }
 
-    private PointerBuffer getReqInstanceExtensions(MemoryStack stack) {
+    private PointerBuffer queryReqInstanceExtensions(MemoryStack stack) {
         PointerBuffer glfwReqExtensions = glfwGetRequiredInstanceExtensions();
         if (glfwReqExtensions == null)
             logger.error("glfwGetRequiredInstanceExtensions failed to find the platform surface extensions");
