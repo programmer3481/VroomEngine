@@ -4,6 +4,7 @@ import org.joml.Vector2i;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
+import fuel3d.Window.SurfaceInfo;
 
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
@@ -237,8 +238,8 @@ public class Fuel3D {
             //create initWindow surface
             initWindow.initWindow(this);
 
-            pickPhysicalDevice(initWindow.getSurface());
-            createLogicalDevice(initWindow.getSurface());
+            pickPhysicalDevice(initWindow);
+            createLogicalDevice(initWindow);
 
             initWindow.checkSupport();
         }
@@ -252,9 +253,9 @@ public class Fuel3D {
         vkDestroyInstance(instance, null);
     }
 
-    private void createLogicalDevice(long testSurface) { // Also sets graphicsQueue
+    private void createLogicalDevice(Window testWindow) { // Also sets graphicsQueue
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            queueIndices = getQueueFamilyIndices(stack, physicalDevice, testSurface);
+            queueIndices = getQueueFamilyIndices(stack, physicalDevice, testWindow);
 
             VkDeviceQueueCreateInfo.Buffer deviceQueueInfo = VkDeviceQueueCreateInfo.malloc(queueIndices.graphics == queueIndices.present ? 1 : 2, stack);
             deviceQueueInfo.get(0)
@@ -300,7 +301,7 @@ public class Fuel3D {
         }
     }
 
-    private void pickPhysicalDevice(long testSurface) {
+    private void pickPhysicalDevice(Window testWindow) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer ib = stack.mallocInt(1);
 
@@ -317,7 +318,7 @@ public class Fuel3D {
                     VkPhysicalDevice testDevice = new VkPhysicalDevice(availablePhysicalDevices.get(i), instance);
                     vkGetPhysicalDeviceProperties(testDevice, availablePhysicalDevicesProperties.get(i));
 
-                    if (isDeviceSupported(testDevice, availablePhysicalDevicesProperties.get(i), testSurface)) {
+                    if (isDeviceSupported(testDevice, availablePhysicalDevicesProperties.get(i), testWindow)) {
                         physicalDevices.add(testDevice);
                         deviceNameList.add(availablePhysicalDevicesProperties.get(i).deviceNameString());
                     }
@@ -333,7 +334,7 @@ public class Fuel3D {
         }
     }
 
-    private boolean isDeviceSupported(VkPhysicalDevice physicalDevice, VkPhysicalDeviceProperties properties, long testSurface) {
+    private boolean isDeviceSupported(VkPhysicalDevice physicalDevice, VkPhysicalDeviceProperties properties, Window testWindow) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer ib = stack.mallocInt(1);
 
@@ -361,36 +362,17 @@ public class Fuel3D {
                 }
             }
 
-            SurfaceInfo sInfo = getSurfaceInfo(stack, physicalDevice, testSurface);
-            boolean swapchainSupported = sInfo.formats.capacity() != 0 && sInfo.presentModes.capacity() != 0;
+            SurfaceInfo sInfo = testWindow.getSurfaceInfo(stack, physicalDevice);
+            if (!sInfo.available()) {
+                return false;
+            }
 
-            AvailableQueueFamilyIndices indices = getQueueFamilyIndices(stack, physicalDevice, testSurface);
-            return indices.allAvailable() && swapchainSupported;
+            AvailableQueueFamilyIndices indices = getQueueFamilyIndices(stack, physicalDevice, testWindow);
+            return indices.allAvailable();
         }
     }
 
-    private SurfaceInfo getSurfaceInfo(MemoryStack stack, VkPhysicalDevice physicalDevice, long testSurface) {
-        IntBuffer ib = stack.mallocInt(1);
-
-        VkSurfaceCapabilitiesKHR capabilities = VkSurfaceCapabilitiesKHR.malloc(stack);
-        chErr(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, testSurface, capabilities));
-
-        chErr(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, testSurface, ib, null));
-        VkSurfaceFormatKHR.Buffer surfaceFormats = VkSurfaceFormatKHR.malloc(ib.get(0), stack);
-        if (ib.get(0) > 0) {
-            vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, testSurface, ib, surfaceFormats);
-        }
-
-        vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, testSurface, ib, null);
-        IntBuffer presentModes = stack.mallocInt(ib.get(0));
-        if (ib.get(0) > 0) {
-            vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, testSurface, ib, presentModes);
-        }
-
-        return new SurfaceInfo(capabilities, surfaceFormats, presentModes);
-    }
-
-    private AvailableQueueFamilyIndices getQueueFamilyIndices(MemoryStack stack, VkPhysicalDevice physicalDevice, long testSurface) {
+    private AvailableQueueFamilyIndices getQueueFamilyIndices(MemoryStack stack, VkPhysicalDevice physicalDevice, Window testWindow) {
         IntBuffer ib = stack.mallocInt(1);
 
         int graphicsQueue = -1;
@@ -402,18 +384,31 @@ public class Fuel3D {
             vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, ib, availableQueueFamilies);
 
             for (int i = 0; i < availableQueueFamilies.capacity(); i++) {
+                boolean bothAvailable = true;
+
                 if ((availableQueueFamilies.get(i).queueFlags() & VK_QUEUE_GRAPHICS_BIT) != 0) {
-                    graphicsQueue = i;
+                    if (graphicsQueue < 0) {
+                        graphicsQueue = i;
+                    }
+                }
+                else {
+                    bothAvailable = false;
                 }
 
-                chErr(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, testSurface, ib));
-                if (ib.get(0) == VK_TRUE) {
-                    if (!platform.equals("Windows") || vkGetPhysicalDeviceWin32PresentationSupportKHR(physicalDevice, i)) {
+
+                chErr(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, testWindow.getSurface(), ib));
+                if (ib.get(0) == VK_TRUE && (!platform.equals("Windows") || vkGetPhysicalDeviceWin32PresentationSupportKHR(physicalDevice, i))) {
+                    if (presentQueue < 0) {
                         presentQueue = i;
                     }
                 }
+                else {
+                    bothAvailable = false;
+                }
 
-                if (graphicsQueue >= 0 && presentQueue >= 0) {
+                if (bothAvailable) {
+                    graphicsQueue = i;
+                    presentQueue = i;
                     break;
                 }
             }
@@ -506,8 +501,6 @@ public class Fuel3D {
             return graphics >= 0 && present >= 0;
         }
     }
-
-    private record SurfaceInfo(VkSurfaceCapabilitiesKHR capabilities, VkSurfaceFormatKHR.Buffer formats, IntBuffer presentModes) { }
 
     public record Version(int major, int minor, int patch) { }
 
