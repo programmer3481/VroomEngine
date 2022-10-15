@@ -1,10 +1,12 @@
 package fuel3d;
 
+import org.lwjgl.glfw.GLFWFramebufferSizeCallbackI;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
 import static org.lwjgl.vulkan.KHRSurface.*;
 import static org.lwjgl.vulkan.VK10.*;
+import static org.lwjgl.vulkan.KHRSwapchain.*;
 
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
@@ -16,22 +18,29 @@ import static org.lwjgl.system.MemoryUtil.*;
 public class Window {
     private long window;
     private long surface;
-    private KHRSwapchain swapchain;
+    private long swapchain;
     private int width, height;
     private String title;
     private Logger logger;
     private Fuel3D renderer;
+    private boolean vSync;
     private boolean isVisible = false;
 
-    public Window(int width, int height, String title, Fuel3D renderer) {
+    public Window(int width, int height, String title, Fuel3D renderer, boolean vSync) {
         this.width = width;
         this.height = height;
         this.title = title;
+        this.vSync = vSync;
 
         if (renderer != null) {
             initWindow(renderer);
+            createSwapChain();
             checkSupport();
         }
+    }
+
+    public Window(int width, int height, String title, Fuel3D renderer) {
+        this(width, height, title, renderer, true);
     }
 
     protected void initWindow(Fuel3D renderer) {
@@ -50,6 +59,11 @@ public class Window {
             if (window == NULL)
                 logger.error("[Fuel3D] ERROR: Window creation failed!");
 
+            glfwSetFramebufferSizeCallback(window, (window, width, height) -> {
+                this.width = width;
+                this.height = height;
+            });
+
             renderer.chErr(glfwCreateWindowSurface(renderer.getInstance(), window, null, lb));
             surface = lb.get(0);
         }
@@ -63,6 +77,96 @@ public class Window {
             if (ib.get(0) != VK_TRUE) {
                 logger.error("Physical device does not support this window surface");
             }
+        }
+    }
+
+    protected void createSwapChain() {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            SurfaceInfo surfaceInfo = querySurfaceInfo(stack, renderer.getPhysicalDevice());
+            VkSurfaceFormatKHR surfaceFormat = chooseSwapchainSurfaceFormat(surfaceInfo);
+
+            VkSwapchainCreateInfoKHR swapchainInfo = VkSwapchainCreateInfoKHR.malloc(stack)
+                    .sType$Default()
+                    .pNext(NULL)
+                    .flags(0)
+                    .surface(surface)
+                    .minImageCount(chooseSwapchainImageCount(surfaceInfo))
+                    .imageFormat(surfaceFormat.format())
+                    .imageColorSpace(surfaceFormat.colorSpace())
+                    .imageExtent(chooseSwapchainExtent(surfaceInfo, stack))
+                    .imageArrayLayers(1)
+                    .imageUsage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+                    .preTransform(surfaceInfo.capabilities.currentTransform())
+                    .compositeAlpha(VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
+                    .presentMode(chooseSwapchainPresentMode(surfaceInfo))
+                    .clipped(true)
+                    .oldSwapchain(VK_NULL_HANDLE);
+            if (renderer.getQueueIndices().present() != renderer.getQueueIndices().graphics()) {
+                swapchainInfo
+                        .imageSharingMode(VK_SHARING_MODE_CONCURRENT)
+                        .queueFamilyIndexCount(2)
+                        .pQueueFamilyIndices(stack.ints(renderer.getQueueIndices().graphics(), renderer.getQueueIndices().present()));
+            }
+            else {
+                swapchainInfo.imageSharingMode(VK_SHARING_MODE_EXCLUSIVE);
+            }
+            LongBuffer lb = stack.mallocLong(1);
+            renderer.chErr(vkCreateSwapchainKHR(renderer.getDevice(), swapchainInfo, null, lb));
+            swapchain = lb.get(0);
+        }
+    }
+
+    private VkSurfaceFormatKHR chooseSwapchainSurfaceFormat(SurfaceInfo info) {
+        for (VkSurfaceFormatKHR format : info.formats) {
+            if (format.format() == VK_FORMAT_B8G8R8_SRGB && format.colorSpace() == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                return format;
+            }
+        }
+        return info.formats.get(0);
+    }
+
+    private int chooseSwapchainPresentMode(SurfaceInfo info) {
+        if (!vSync) {
+            for (int i = 0; i < info.presentModes.capacity(); i++) {
+                if (info.presentModes.get(i) == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+                    return VK_PRESENT_MODE_IMMEDIATE_KHR;
+                }
+            }
+        }
+        for (int i = 0; i < info.presentModes.capacity(); i++) {
+            if (info.presentModes.get(i) == VK_PRESENT_MODE_MAILBOX_KHR) {
+                return VK_PRESENT_MODE_MAILBOX_KHR;
+            }
+        }
+        return VK_PRESENT_MODE_FIFO_KHR;
+    }
+
+    private VkExtent2D chooseSwapchainExtent(SurfaceInfo info, MemoryStack stack) {
+        if (info.capabilities.currentExtent().width() != 0xFFFFFFFF) {
+            width = info.capabilities.currentExtent().width();
+            height = info.capabilities.currentExtent().height();
+            return info.capabilities.currentExtent();
+        }
+        else {
+            VkExtent2D extent = VkExtent2D.malloc(stack)
+                    .width(width)
+                    .height(height);
+            extent.width(Math.max(
+                    info.capabilities.minImageExtent().width(),
+                    Math.min(info.capabilities.maxImageExtent().width(), extent.width())));
+            extent.height(Math.max(
+                    info.capabilities.minImageExtent().height(),
+                    Math.min(info.capabilities.maxImageExtent().height(), extent.height())));
+            return extent;
+        }
+    }
+
+    private int chooseSwapchainImageCount(SurfaceInfo info) {
+        if (info.capabilities.maxImageCount() == 0) {
+            return info.capabilities.minImageCount() + 1;
+        }
+        else {
+            return Math.min(info.capabilities.minImageCount() + 1, info.capabilities.maxImageCount());
         }
     }
 
@@ -88,6 +192,7 @@ public class Window {
     }
 
     public void destroy() {
+        vkDestroySwapchainKHR(renderer.getDevice(), swapchain, null);
         vkDestroySurfaceKHR(renderer.getInstance(), surface, null);
         glfwDestroyWindow(window);
     }
@@ -128,6 +233,10 @@ public class Window {
 
     public String getTitle() {
         return title;
+    }
+
+    public boolean vSync() {
+        return vSync;
     }
 
     protected record SurfaceInfo(VkSurfaceCapabilitiesKHR capabilities, VkSurfaceFormatKHR.Buffer formats, IntBuffer presentModes) {

@@ -344,7 +344,7 @@ public class Fuel3D {
                 for (String extension : deviceExtensionList) {
                     boolean found = false;
                     for (VkExtensionProperties availableDeviceExtension : availableDeviceExtensions) {
-                        if (extension.equals(availableDeviceExtensions.extensionNameString())) {
+                        if (extension.equals(availableDeviceExtension.extensionNameString())) {
                             found = true;
                             break;
                         }
@@ -470,6 +470,10 @@ public class Fuel3D {
 
     protected VkPhysicalDevice getPhysicalDevice() {
         return physicalDevice;
+    }
+
+    protected VkDevice getDevice() {
+        return device;
     }
 
     protected AvailableQueueFamilyIndices getQueueIndices() {
