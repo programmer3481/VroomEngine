@@ -19,11 +19,13 @@ public class Window {
     private long window;
     private long surface;
     private long swapchain;
+    private int swapchainImageFormat;
     private int width, height;
+    private ImageView[] swapchainImageViews;
     private String title;
     private Logger logger;
     private Fuel3D renderer;
-    private boolean vSync;
+    private final boolean vSync;
     private boolean isVisible = false;
 
     public Window(int width, int height, String title, Fuel3D renderer, boolean vSync) {
@@ -34,8 +36,8 @@ public class Window {
 
         if (renderer != null) {
             initWindow(renderer);
-            createSwapChain();
             checkSupport();
+            createSwapChain();
         }
     }
 
@@ -82,6 +84,9 @@ public class Window {
 
     protected void createSwapChain() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
+            LongBuffer lb = stack.mallocLong(1);
+            IntBuffer ib = stack.mallocInt(1);
+
             SurfaceInfo surfaceInfo = querySurfaceInfo(stack, renderer.getPhysicalDevice());
             VkSurfaceFormatKHR surfaceFormat = chooseSwapchainSurfaceFormat(surfaceInfo);
 
@@ -91,7 +96,7 @@ public class Window {
                     .flags(0)
                     .surface(surface)
                     .minImageCount(chooseSwapchainImageCount(surfaceInfo))
-                    .imageFormat(surfaceFormat.format())
+                    .imageFormat(swapchainImageFormat = surfaceFormat.format())
                     .imageColorSpace(surfaceFormat.colorSpace())
                     .imageExtent(chooseSwapchainExtent(surfaceInfo, stack))
                     .imageArrayLayers(1)
@@ -110,10 +115,44 @@ public class Window {
             else {
                 swapchainInfo.imageSharingMode(VK_SHARING_MODE_EXCLUSIVE);
             }
-            LongBuffer lb = stack.mallocLong(1);
             renderer.chErr(vkCreateSwapchainKHR(renderer.getDevice(), swapchainInfo, null, lb));
             swapchain = lb.get(0);
+
+            renderer.chErr(vkGetSwapchainImagesKHR(renderer.getDevice(), swapchain, ib, null));
+            LongBuffer swapchainImages = stack.mallocLong(ib.get(0));
+            renderer.chErr(vkGetSwapchainImagesKHR(renderer.getDevice(), swapchain, ib, swapchainImages));
+
+            swapchainImageViews = createImageViews(swapchainImages, stack);
         }
+    }
+
+    private ImageView[] createImageViews(LongBuffer images, MemoryStack stack) {
+        LongBuffer lb = stack.mallocLong(1);
+
+        ImageView[] result = new ImageView[images.capacity()];
+        for (int i = 0; i < images.capacity(); i++) {
+            VkImageViewCreateInfo imageViewInfo = VkImageViewCreateInfo.malloc(stack)
+                    .sType$Default()
+                    .pNext(NULL)
+                    .flags(0)
+                    .image(images.get(i))
+                    .viewType(VK_IMAGE_VIEW_TYPE_2D)
+                    .format(swapchainImageFormat)
+                    .components(vkComponentMapping -> vkComponentMapping
+                            .r(VK_COMPONENT_SWIZZLE_IDENTITY)
+                            .g(VK_COMPONENT_SWIZZLE_IDENTITY)
+                            .b(VK_COMPONENT_SWIZZLE_IDENTITY)
+                            .a(VK_COMPONENT_SWIZZLE_IDENTITY))
+                    .subresourceRange(vkImageSubresourceRange -> vkImageSubresourceRange
+                            .aspectMask(VK_IMAGE_ASPECT_COLOR_BIT)
+                            .baseMipLevel(0)
+                            .levelCount(1)
+                            .baseArrayLayer(0)
+                            .layerCount(1));
+            renderer.chErr(vkCreateImageView(renderer.getDevice(), imageViewInfo, null, lb));
+            result[i] = new ImageView(images.get(i), lb.get(0));
+        }
+        return result;
     }
 
     private VkSurfaceFormatKHR chooseSwapchainSurfaceFormat(SurfaceInfo info) {
@@ -192,6 +231,9 @@ public class Window {
     }
 
     public void destroy() {
+        for (ImageView swapchainImageView : swapchainImageViews) {
+            vkDestroyImageView(renderer.getDevice(), swapchainImageView.imageview, null);
+        }
         vkDestroySwapchainKHR(renderer.getDevice(), swapchain, null);
         vkDestroySurfaceKHR(renderer.getInstance(), surface, null);
         glfwDestroyWindow(window);
@@ -235,9 +277,16 @@ public class Window {
         return title;
     }
 
+    public void setTitle(String title) {
+        glfwSetWindowTitle(window, title);
+        this.title = title;
+    }
+
     public boolean vSync() {
         return vSync;
     }
+
+    private record ImageView(long image, long imageview) {};
 
     protected record SurfaceInfo(VkSurfaceCapabilitiesKHR capabilities, VkSurfaceFormatKHR.Buffer formats, IntBuffer presentModes) {
         public boolean available() {

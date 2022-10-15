@@ -239,6 +239,7 @@ public class Fuel3D {
             createLogicalDevice(initWindow);
 
             initWindow.checkSupport();
+            initWindow.createSwapChain();
         }
     }
 
