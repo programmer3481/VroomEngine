@@ -14,6 +14,7 @@ import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.vulkan.KHRWin32Surface.VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
 import static org.lwjgl.vulkan.VK10.*;
+import static org.lwjgl.vulkan.VK12.VK_API_VERSION_1_2;
 import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.KHRSurface.*;
 import static org.lwjgl.vulkan.KHRWin32Surface.vkGetPhysicalDeviceWin32PresentationSupportKHR;
@@ -148,7 +149,8 @@ public class Fuel3D {
                     .applicationVersion(VK_MAKE_VERSION(appVersion.major, appVersion.minor, appVersion.patch))
                     .pEngineName(stack.UTF8(engineName))
                     .engineVersion(VK_MAKE_VERSION(engineVersion.major, engineVersion.minor, engineVersion.patch))
-                    .apiVersion(VK.getInstanceVersionSupported());
+                    .apiVersion(VK.getInstanceVersionSupported())
+                    .apiVersion(VK_API_VERSION_1_2);
             VkInstanceCreateInfo instanceInfo = VkInstanceCreateInfo.malloc(stack)
                     .sType$Default()
                     .pNext(NULL)
