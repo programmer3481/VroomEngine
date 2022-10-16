@@ -1,6 +1,5 @@
 package fuel3d;
 
-import org.lwjgl.glfw.GLFWFramebufferSizeCallbackI;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
@@ -286,7 +285,7 @@ public class Window {
         return vSync;
     }
 
-    private record ImageView(long image, long imageview) {};
+    private record ImageView(long image, long imageview) {}
 
     protected record SurfaceInfo(VkSurfaceCapabilitiesKHR capabilities, VkSurfaceFormatKHR.Buffer formats, IntBuffer presentModes) {
         public boolean available() {

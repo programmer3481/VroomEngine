@@ -40,8 +40,7 @@ public class Fuel3D {
     private final String appName, engineName;
     private final Version appVersion, engineVersion;
 
-    private final String[] instanceExtensionList = new String[] { // Empty for now
-    };
+    private final String[] instanceExtensionList = new String[0]; // Empty for now;
     private final String[] deviceExtensionList = new String[] {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
@@ -224,6 +223,9 @@ public class Fuel3D {
 
             // Find surface type (used for determining what function to use for checking physical device queue surface support)
             PointerBuffer glfwReqExtensions = glfwGetRequiredInstanceExtensions();
+            if (glfwReqExtensions == null) {
+                logger.error("glfwGetRequiredInstanceExtensions() failed to find the required instance extensions");
+            }
             for (int i = 0; i < glfwReqExtensions.capacity(); i++) {
                 if (glfwReqExtensions.getStringASCII(i).equals(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)) {
                     platform = "Windows";
@@ -256,14 +258,14 @@ public class Fuel3D {
             queueIndices = queryQueueFamilyIndices(stack, physicalDevice, testWindow);
 
             VkDeviceQueueCreateInfo.Buffer deviceQueueInfo = VkDeviceQueueCreateInfo.malloc(queueIndices.graphics == queueIndices.present ? 1 : 2, stack);
-            deviceQueueInfo.get(0)
+            (deviceQueueInfo.get(0))
                     .sType$Default()
                     .pNext(NULL)
                     .flags(0)
                     .queueFamilyIndex(queueIndices.graphics)
                     .pQueuePriorities(stack.floats(1.0f));
             if (queueIndices.graphics != queueIndices.present) {
-                deviceQueueInfo.get(1)
+                (deviceQueueInfo.get(1))
                         .sType$Default()
                         .pNext(NULL)
                         .flags(0)
@@ -441,8 +443,12 @@ public class Fuel3D {
         return deviceNameList;
     }
 
-    protected Logger getLogger() {
+    public Logger getLogger() {
         return logger;
+    }
+
+    public Debugger getDebugger() {
+        return debugger;
     }
 
     public Version getAppVersion() {
@@ -506,7 +512,7 @@ public class Fuel3D {
     public record Version(int major, int minor, int patch) { }
 
     public static class Settings {
-        public String appName = "App", engineName = "Fuel3D";
+        public String appName = "App", engineName = NAME;
         public Version appVersion = new Version(1, 0 ,0), engineVersion = VERSION;
         public Logger logger = new Logger(new Logger.Settings());
         private boolean validate = false;
