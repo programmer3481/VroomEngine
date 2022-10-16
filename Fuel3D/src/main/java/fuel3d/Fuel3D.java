@@ -451,20 +451,28 @@ public class Fuel3D {
         physicalDevice = physicalDevices.get(index);
         logger.log(MessageType.INFO, "Using GPU: " + deviceNameList.get(index));
 
+        // destory all shaders
+        for (Shader shader : shaders) {
+            shader.destroy();
+        }
+
+        // destroy all windows' swap chains
+        for (Window window : windows) {
+            window.checkSupport();
+            window.destroySwapchain();
+        }
+
         // recreate logical device
         vkDestroyDevice(device, null);
         createLogicalDevice(testWindow);
 
         //recompile all shaders
         for (Shader shader : shaders) {
-            shader.destroy();
             shader.create();
         }
 
         // recreate all windows' swap chains
         for (Window window : windows) {
-            window.checkSupport();
-            window.destroySwapchain();
             window.createSwapChain();
         }
     }
