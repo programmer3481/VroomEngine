@@ -22,15 +22,16 @@ public class Shader {
     public Shader(ByteBuffer code, Fuel3D renderer) {
         this.renderer = renderer;
         this.code = code;
+        renderer.addShader(this);
 
-        createShader();
+        create();
     }
 
     public Shader(byte[] code, Fuel3D renderer) {
         this(ByteBuffer.wrap(code), renderer);
     }
 
-    protected void createShader() {
+    protected void create() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             LongBuffer lb = stack.mallocLong(1);
 

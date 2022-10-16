@@ -33,6 +33,7 @@ public class Window {
         this.vSync = vSync;
 
         if (renderer != null) {
+            renderer.addWindow(this);
             initWindow(renderer);
             checkSupport();
             createSwapChain();
@@ -227,11 +228,15 @@ public class Window {
         return new SurfaceInfo(capabilities, surfaceFormats, presentModes);
     }
 
-    public void destroy() {
+    protected void destroySwapchain() {
         for (ImageView swapchainImageView : swapchainImageViews) {
             vkDestroyImageView(renderer.getDevice(), swapchainImageView.imageview, null);
         }
         vkDestroySwapchainKHR(renderer.getDevice(), swapchain, null);
+    }
+
+    public void destroy() {
+        destroySwapchain();
         vkDestroySurfaceKHR(renderer.getInstance(), surface, null);
         glfwDestroyWindow(window);
     }

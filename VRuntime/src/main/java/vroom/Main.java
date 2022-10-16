@@ -39,6 +39,11 @@ public class Main {
 
         mainWindow.visible(true);
         extra.visible(true);
+
+        if (f3d.getDeviceNames().size() > 1) {
+            System.out.println("---------------- CHANGING DEVICE ----------------");
+            f3d.setDevice(1, mainWindow);
+        }
         while (!mainWindow.windowShouldClose() && !extra.windowShouldClose()) {
             mainWindow.pollEvents();
             extra.pollEvents();

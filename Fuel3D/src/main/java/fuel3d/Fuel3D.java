@@ -36,6 +36,9 @@ public class Fuel3D {
     private final Debugger debugger;
     private final Logger logger;
 
+    private final  List<Window> windows = new ArrayList<>();
+    private final List<Shader> shaders = new ArrayList<>();
+
     private final boolean validate; // 'Debug mode'
     private final String appName, engineName;
     private final Version appVersion, engineVersion;
@@ -234,6 +237,7 @@ public class Fuel3D {
                 }
             }
 
+            addWindow(initWindow);
             //create initWindow surface
             initWindow.initWindow(this);
 
@@ -324,7 +328,7 @@ public class Fuel3D {
                     }
                 }
                 if (physicalDevices.size() > 0){
-                    physicalDevice = physicalDevices.get(0); // Use the first one TODO: support switching gpus
+                    physicalDevice = physicalDevices.get(0); // Use the first one // TODO: support switching gpus
                     logger.log(MessageType.INFO, "Using GPU: " + availablePhysicalDevicesProperties.get(0).deviceNameString());
                 }
             }
@@ -443,6 +447,28 @@ public class Fuel3D {
         return deviceNameList;
     }
 
+    public void setDevice(int index, Window testWindow) {
+        physicalDevice = physicalDevices.get(index);
+        logger.log(MessageType.INFO, "Using GPU: " + deviceNameList.get(index));
+
+        // recreate logical device
+        vkDestroyDevice(device, null);
+        createLogicalDevice(testWindow);
+
+        //recompile all shaders
+        for (Shader shader : shaders) {
+            shader.destroy();
+            shader.create();
+        }
+
+        // recreate all windows' swap chains
+        for (Window window : windows) {
+            window.checkSupport();
+            window.destroySwapchain();
+            window.createSwapChain();
+        }
+    }
+
     public Logger getLogger() {
         return logger;
     }
@@ -485,6 +511,22 @@ public class Fuel3D {
 
     protected AvailableQueueFamilyIndices getQueueIndices() {
         return queueIndices;
+    }
+
+    protected void addWindow(Window window) {
+        windows.add(window);
+    }
+
+    protected void removeWindow(Window window) {
+        windows.remove(window);
+    }
+
+    protected void addShader(Shader shader) {
+        shaders.add(shader);
+    }
+
+    protected void removeShader(Shader shader) {
+        shaders.remove(shader);
     }
 
     //endregion
