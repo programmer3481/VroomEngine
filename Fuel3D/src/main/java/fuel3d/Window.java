@@ -22,7 +22,6 @@ public class Window {
     private int width, height;
     private ImageView[] swapchainImageViews;
     private String title;
-    private Logger logger;
     private Fuel3D renderer;
     private final boolean vSync;
     private boolean isVisible = false;
@@ -46,7 +45,6 @@ public class Window {
 
     protected void initWindow(Fuel3D renderer) {
         this.renderer = renderer;
-        this.logger = renderer.getLogger();
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             LongBuffer lb = stack.mallocLong(1);
@@ -58,7 +56,7 @@ public class Window {
 
             window = glfwCreateWindow(width, height, title, NULL, NULL);
             if (window == NULL)
-                logger.error("[Fuel3D] ERROR: Window creation failed!");
+                renderer.getLogger().error("[Fuel3D] ERROR: Window creation failed!");
 
             glfwSetFramebufferSizeCallback(window, (window, width, height) -> {
                 this.width = width;
@@ -76,7 +74,7 @@ public class Window {
 
             renderer.chErr(vkGetPhysicalDeviceSurfaceSupportKHR(renderer.getPhysicalDevice(), renderer.getQueueIndices().present(), surface, ib));
             if (ib.get(0) != VK_TRUE) {
-                logger.error("Physical device does not support this window surface");
+                renderer.getLogger().error("Physical device does not support this window surface");
             }
         }
     }
