@@ -1,12 +1,15 @@
 package vroom;
 
-import fuel3d.Fuel3D;
-import fuel3d.Debugger;
-import fuel3d.Logger;
-import fuel3d.Window;
+import fuel3d.*;
+
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.file.FileSystem;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 public class Main {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException, URISyntaxException {
         Fuel3D.init();
 
         Debugger debugger = new Debugger(new Debugger.Settings());
@@ -37,6 +40,12 @@ public class Main {
 
         Window extra = new Window(1280, 720, "Multiple windows go brrr", f3d);
 
+
+        Shader vertShader = Shader.fromGLSLFile("C:/Users/gwch3/IdeaProjects/VroomEngine/VRuntime/src/main/resources/shaders/vert.glsl",
+                Shader.ShaderType.VertexShader, f3d);
+        Shader fragShader = Shader.fromGLSLFile("C:/Users/gwch3/IdeaProjects/VroomEngine/VRuntime/src/main/resources/shaders/frag.glsl",
+                Shader.ShaderType.FragmentShader, f3d);
+
         mainWindow.visible(true);
         extra.visible(true);
 
@@ -48,6 +57,10 @@ public class Main {
             mainWindow.pollEvents();
             extra.pollEvents();
         }
+
+        vertShader.destroy();
+        fragShader.destroy();
+
         mainWindow.destroy();
         extra.destroy();
 

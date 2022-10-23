@@ -16,10 +16,10 @@ import static org.lwjgl.util.shaderc.Shaderc.*;
 
 public class Shader {
     private final Fuel3D renderer;
-    private final ByteBuffer code;
+    private final byte[] code;
     private long shader;
 
-    public Shader(ByteBuffer code, Fuel3D renderer) {
+    public Shader(byte[] code, Fuel3D renderer) {
         this.renderer = renderer;
         this.code = code;
         renderer.addShader(this);
@@ -27,15 +27,11 @@ public class Shader {
         create();
     }
 
-    public Shader(byte[] code, Fuel3D renderer) {
-        this(ByteBuffer.wrap(code), renderer);
-    }
-
     protected void create() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             LongBuffer lb = stack.mallocLong(1);
 
-            ByteBuffer codeByteBuf = memAlloc(code.capacity()).put(code);
+            ByteBuffer codeByteBuf = stack.malloc(code.length).put(code);
             codeByteBuf.flip();
 
             VkShaderModuleCreateInfo shaderModuleInfo = VkShaderModuleCreateInfo.malloc(stack)
@@ -65,14 +61,16 @@ public class Shader {
         return new Shader(Files.readAllBytes(path), renderer);
     }
 
-    public static Shader fromGLSLCode(String code, Fuel3D renderer) {
+    public static Shader fromGLSLCode(String code, ShaderType type, Fuel3D renderer) {
         long compiler = shaderc_compiler_initialize();
         long options = shaderc_compile_options_initialize();
+
+        renderer.getLogger().log(Logger.MessageType.INFO, "Compiling shader...");
 
         long result = shaderc_compile_into_spv(
                 compiler,
                 code,
-                shaderc_glsl_vertex_shader,
+                type.getTypeId(),
                 "",
                 "main",
                 options
@@ -83,23 +81,29 @@ public class Shader {
                 || shaderc_result_get_bytes(result) == null) {
             renderer.getLogger().error("Shader compilation error: " + shaderc_result_get_error_message(result));
         }
-        ByteBuffer resultByteBuf = shaderc_result_get_bytes(result);
+        ByteBuffer resultCodeBuffer = shaderc_result_get_bytes(result);
+        if (resultCodeBuffer == null) renderer.getLogger().error("Returned compiled code is null");
+        byte[] resultCode = new byte[resultCodeBuffer.capacity()];
+
+        for (int i = 0; i < resultCodeBuffer.capacity(); i++) {
+            resultCode[i] = resultCodeBuffer.get(i);
+        }
 
         shaderc_result_release(result);
         shaderc_compile_options_release(options);
         shaderc_compiler_release(compiler);
 
-        return new Shader(resultByteBuf, renderer);
+        return new Shader(resultCode, renderer);
     }
 
-    public static Shader fromGLSLFile(Path path, Fuel3D renderer) throws IOException {
+    public static Shader fromGLSLFile(Path path, ShaderType type, Fuel3D renderer) throws IOException {
         long compiler = shaderc_compiler_initialize();
         long options = shaderc_compile_options_initialize();
 
         long result = shaderc_compile_into_spv(
                 compiler,
                 Files.readString(path),
-                shaderc_glsl_vertex_shader,
+                type.getTypeId(),
                 path.getFileName().toString(),
                 "main",
                 options
@@ -110,16 +114,36 @@ public class Shader {
                 || shaderc_result_get_bytes(result) == null) {
             renderer.getLogger().error("Shader compilation error: " + shaderc_result_get_error_message(result));
         }
-        ByteBuffer resultByteBuf = shaderc_result_get_bytes(result);
+        ByteBuffer resultCodeBuffer = shaderc_result_get_bytes(result);
+        if (resultCodeBuffer == null) renderer.getLogger().error("Returned compiled code is null");
+        byte[] resultCode = new byte[resultCodeBuffer.capacity()];
+
+        for (int i = 0; i < resultCodeBuffer.capacity(); i++) {
+            resultCode[i] = resultCodeBuffer.get(i);
+        }
 
         shaderc_result_release(result);
         shaderc_compile_options_release(options);
         shaderc_compiler_release(compiler);
 
-        return new Shader(resultByteBuf, renderer);
+        return new Shader(resultCode, renderer);
     }
 
-    public static Shader fromGLSLFile(String path, Fuel3D renderer) throws IOException {
-        return fromGLSLFile(Paths.get(path), renderer);
+    public static Shader fromGLSLFile(String path, ShaderType type, Fuel3D renderer) throws IOException {
+        return fromGLSLFile(Paths.get(path), type, renderer);
+    }
+
+    public enum ShaderType {
+        VertexShader(shaderc_vertex_shader), FragmentShader(shaderc_fragment_shader);
+
+        private final int typeId;
+
+        ShaderType(int typeId) {
+            this.typeId = typeId;
+        }
+
+        private int getTypeId() {
+            return typeId;
+        }
     }
 }
