@@ -252,6 +252,17 @@ public class Fuel3D {
     }
 
     public void destroy() {
+        logger.log(MessageType.INFO, "Cleaning up");
+        // destroy all shaders
+        for (Shader shader : shaders) {
+            shader.destroy();
+        }
+
+        // destroy all windows' swap chains
+        for (Window window : windows) {
+            window.destroy();
+        }
+
         vkDestroyDevice(device, null);
         if (validate) {
             vkDestroyDebugUtilsMessengerEXT(instance, debugMessenger, null);
@@ -453,7 +464,7 @@ public class Fuel3D {
         physicalDevice = physicalDevices.get(index);
         logger.log(MessageType.INFO, "Using GPU: " + deviceNameList.get(index));
 
-        // destory all shaders
+        // destroy all shaders
         for (Shader shader : shaders) {
             shader.destroy();
         }
