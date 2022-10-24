@@ -1,11 +1,30 @@
 package vroom;
 
+import com.sun.jna.Native;
+import com.sun.jna.platform.win32.Kernel32;
+import com.sun.jna.platform.win32.WinDef;
+import com.sun.jna.platform.win32.WinNT;
+import com.sun.jna.platform.win32.Wincon;
+import com.sun.jna.ptr.IntByReference;
 import fuel3d.*;
+import org.lwjgl.vulkan.VkDebugMarkerObjectNameInfoEXT;
 
 import java.io.IOException;
 
+import static com.sun.jna.platform.win32.Wincon.ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+
 public class Main {
     public static void main(String[] args) throws IOException {
+        if (System.getProperty("os.name").startsWith("Windows")) {
+            Wincon wincon = Native.load("kernel32", Kernel32.class);
+            WinNT.HANDLE hOut = wincon.GetStdHandle(Wincon.STD_OUTPUT_HANDLE);
+            IntByReference dwMode = new IntByReference();
+            wincon.GetConsoleMode(hOut, dwMode);
+            dwMode.setValue(dwMode.getValue() | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+            wincon.SetConsoleMode(hOut, dwMode.getValue());
+        }
+
+
         Fuel3D.init();
 
         Debugger debugger = new Debugger(new Debugger.Settings());
@@ -19,11 +38,11 @@ public class Main {
                 }
 
                 case INFO -> type = " INFO:";
-                case WARNING -> type = " WARNING:";
-                case ERROR -> type = " ERROR:";
+                case WARNING -> type = " \033[33mWARNING:\033[1m";
+                case ERROR -> type = " \033[31mERROR:\033[1m";
                 case MISC -> type = "";
             }
-            System.err.format("[Fuel3D]%s %s", type, message);
+            System.err.format("[\033[32m\033[1mFuel3D\033[0m]%s %s\033[0m", type, message);
             System.out.println();
         };
         Logger logger = new Logger(loggerSettings);
