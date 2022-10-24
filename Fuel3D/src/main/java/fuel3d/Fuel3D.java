@@ -39,6 +39,7 @@ public class Fuel3D {
 
     private final  List<Window> windows = new ArrayList<>();
     private final List<Shader> shaders = new ArrayList<>();
+    private final List<Pipeline> pipelines = new ArrayList<>();
 
     private final boolean validate; // 'Debug mode'
     private final String appName, engineName;
@@ -255,13 +256,15 @@ public class Fuel3D {
         logger.log(MessageType.INFO, "Cleaning up");
         // destroy all shaders
         for (Shader shader : shaders) {
-            shader.destroy();
+            shader.destroyObjects();
         }
+        shaders.clear();
 
         // destroy all windows' swap chains
         for (Window window : windows) {
-            window.destroy();
+            window.destroyObjects();
         }
+        windows.clear();
 
         vkDestroyDevice(device, null);
         if (validate) {
@@ -466,7 +469,7 @@ public class Fuel3D {
 
         // destroy all shaders
         for (Shader shader : shaders) {
-            shader.destroy();
+            shader.destroyObjects();
         }
 
         // destroy all windows' swap chains
@@ -479,14 +482,14 @@ public class Fuel3D {
         vkDestroyDevice(device, null);
         createLogicalDevice(testWindow);
 
-        //recompile all shaders
-        for (Shader shader : shaders) {
-            shader.create();
-        }
-
         // recreate all windows' swap chains
         for (Window window : windows) {
             window.createSwapChain();
+        }
+
+        //recompile all shaders
+        for (Shader shader : shaders) {
+            shader.create();
         }
     }
 
@@ -548,6 +551,14 @@ public class Fuel3D {
 
     protected void removeShader(Shader shader) {
         shaders.remove(shader);
+    }
+
+    protected void addPipeline(Pipeline pipeline) {
+        pipelines.add(pipeline);
+    }
+
+    protected void removePipeline(Pipeline pipeline) {
+        pipelines.remove(pipeline);
     }
 
     //endregion

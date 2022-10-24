@@ -46,6 +46,11 @@ public class Shader {
     }
 
     public void destroy() {
+        destroyObjects();
+        renderer.removeShader(this);
+    }
+
+    protected void destroyObjects() {
         vkDestroyShaderModule(renderer.getDevice(), shader, null);
     }
 

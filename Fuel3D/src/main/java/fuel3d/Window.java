@@ -236,6 +236,11 @@ public class Window {
     }
 
     public void destroy() {
+        destroyObjects();
+        renderer.removeWindow(this);
+    }
+
+    protected void destroyObjects() {
         destroySwapchain();
         vkDestroySurfaceKHR(renderer.getInstance(), surface, null);
         glfwDestroyWindow(window);
