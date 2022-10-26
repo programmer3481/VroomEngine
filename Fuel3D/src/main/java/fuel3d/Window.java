@@ -272,6 +272,10 @@ public class Window {
         return surface;
     }
 
+    protected int getImageFormat() {
+        return swapchainImageFormat;
+    }
+
     public int getWidth() {
         return width;
     }

@@ -6,17 +6,20 @@ import org.lwjgl.vulkan.*;
 import java.nio.LongBuffer;
 
 import static org.lwjgl.system.MemoryUtil.*;
+import static org.lwjgl.vulkan.KHRSwapchain.*;
 import static org.lwjgl.vulkan.VK10.*;
 
 public class Pipeline {
     private final Fuel3D renderer;
     private final Shader vertexShader, fragmentShader;
-    private long pipelineLayout;
+    private long pipelineLayout, renderpass;
+    private final int targetImageFormat;
 
-    public Pipeline(Shader vertexShader, Shader fragmentShader, Fuel3D renderer) {
+    public Pipeline(Shader vertexShader, Shader fragmentShader, Window target, Fuel3D renderer) {
         this.renderer = renderer;
         this.vertexShader = vertexShader;
         this.fragmentShader = fragmentShader;
+        this.targetImageFormat = target.getImageFormat();
         renderer.addPipeline(this);
 
         create();
@@ -130,8 +133,46 @@ public class Pipeline {
         }
     }
 
+    private void createRenderPass() {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            LongBuffer lb = stack.mallocLong(1);
+
+            VkAttachmentDescription.Buffer attachmentDescription = VkAttachmentDescription.malloc(1, stack)
+                    .flags(0) // TODO: Configurable number of framebuffer attachments (render targets)
+                    .format(targetImageFormat)
+                    .samples(VK_SAMPLE_COUNT_1_BIT)
+                    .loadOp(VK_ATTACHMENT_LOAD_OP_CLEAR)
+                    .storeOp(VK_ATTACHMENT_STORE_OP_STORE)
+                    .stencilLoadOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                    .stencilStoreOp(VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                    .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
+                    .finalLayout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR); // TODO: Configurable render destination (swapchain optimized for now)
+            VkAttachmentReference.Buffer colorAttachmentReference = VkAttachmentReference.malloc(1, stack)
+                    .attachment(0)
+                    .layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            VkSubpassDescription.Buffer subpassDescription = VkSubpassDescription.calloc(1, stack)
+                    .flags(0) // TODO: Configurable number of subpasses (ex for deferred shading)
+                    .pipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
+                    .pColorAttachments(colorAttachmentReference);
+            VkRenderPassCreateInfo renderPassInfo = VkRenderPassCreateInfo.malloc(stack)
+                    .sType$Default()
+                    .pNext(NULL)
+                    .flags(0)
+                    .pAttachments(attachmentDescription)
+                    .pSubpasses(subpassDescription)
+                    .pDependencies(null);
+            renderer.chErr(vkCreateRenderPass(renderer.getDevice(), renderPassInfo, null, lb));
+            renderpass = lb.get(0);
+        }
+    }
+
+    public boolean isWindowCompatible(Window window) {
+        return window.getImageFormat() == targetImageFormat;
+    }
+
     protected void destroyObjects() {
         vkDestroyPipelineLayout(renderer.getDevice(), pipelineLayout, null);
+        vkDestroyRenderPass(renderer.getDevice(), renderpass, null);
     }
 
     public void destroy() {

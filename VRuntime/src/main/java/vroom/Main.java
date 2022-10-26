@@ -65,7 +65,7 @@ public class Main {
         Shader fragShader = Shader.fromGLSLFile("C:/Users/gwch3/IdeaProjects/VroomEngine/VRuntime/src/main/resources/shaders/frag.glsl",
                 Shader.ShaderType.FragmentShader, f3d);
 
-        Pipeline pipeline = new Pipeline(vertShader, fragShader, f3d);
+        Pipeline pipeline = new Pipeline(vertShader, fragShader, mainWindow, f3d);
 
         mainWindow.visible(true);
         extra.visible(true);
