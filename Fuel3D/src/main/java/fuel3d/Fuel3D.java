@@ -24,7 +24,7 @@ import static fuel3d.Logger.MessageType;
 
 public class Fuel3D {
     private final VkInstance instance;
-    private VkPhysicalDevice physicalDevice = null; // TODO: support switching gpu
+    private VkPhysicalDevice physicalDevice = null;
     private List<String> deviceNameList;
     private VkDevice device = null;
     private AvailableQueueFamilyIndices queueIndices;
@@ -344,7 +344,7 @@ public class Fuel3D {
                     }
                 }
                 if (physicalDevices.size() > 0){
-                    physicalDevice = physicalDevices.get(0); // Use the first one // TODO: support switching gpus
+                    physicalDevice = physicalDevices.get(0); // Use the first one
                     logger.log(MessageType.INFO, "Using GPU: " + availablePhysicalDevicesProperties.get(0).deviceNameString());
                 }
             }
