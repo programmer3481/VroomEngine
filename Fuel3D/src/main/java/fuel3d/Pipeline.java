@@ -130,9 +130,13 @@ public class Pipeline {
         }
     }
 
-    public void destroy() {
+    protected void destroyObjects() {
         vkDestroyPipelineLayout(renderer.getDevice(), pipelineLayout, null);
+    }
 
+    public void destroy() {
+        destroyObjects();
+        renderer.removePipeline(this);
     }
 
 }

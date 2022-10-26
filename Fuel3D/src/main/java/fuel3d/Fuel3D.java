@@ -254,6 +254,12 @@ public class Fuel3D {
 
     public void destroy() {
         logger.log(MessageType.INFO, "Cleaning up");
+        // destroy all pipelines
+        for (Pipeline pipeline : pipelines) {
+            pipeline.destroyObjects();
+        }
+        pipelines.clear();
+
         // destroy all shaders
         for (Shader shader : shaders) {
             shader.destroyObjects();
@@ -467,6 +473,11 @@ public class Fuel3D {
         physicalDevice = physicalDevices.get(index);
         logger.log(MessageType.INFO, "Using GPU: " + deviceNameList.get(index));
 
+        // destroy all pipelines
+        for (Pipeline pipeline : pipelines) {
+            pipeline.destroyObjects();
+        }
+
         // destroy all shaders
         for (Shader shader : shaders) {
             shader.destroyObjects();
@@ -490,6 +501,11 @@ public class Fuel3D {
         //recompile all shaders
         for (Shader shader : shaders) {
             shader.create();
+        }
+
+        // recreate all pipelines
+        for (Pipeline pipeline : pipelines) {
+            pipeline.create();
         }
     }
 

@@ -45,6 +45,9 @@ public class Main {
             System.err.format("[\033[32m\033[1mFuel3D\033[0m]%s %s\033[0m", type, message);
             System.out.println();
         };
+        loggerSettings.errorString =
+                message -> String.format("\n[\033[32m\033[1mFuel3D\033[0m] \033[31mERROR:\033[1m %s\033[0m", message);
+
         Logger logger = new Logger(loggerSettings);
 
         Fuel3D.Settings f3dSettings = new Fuel3D.Settings();
@@ -62,13 +65,19 @@ public class Main {
         Shader fragShader = Shader.fromGLSLFile("C:/Users/gwch3/IdeaProjects/VroomEngine/VRuntime/src/main/resources/shaders/frag.glsl",
                 Shader.ShaderType.FragmentShader, f3d);
 
+        Pipeline pipeline = new Pipeline(vertShader, fragShader, f3d);
+
         mainWindow.visible(true);
         extra.visible(true);
 
+        System.out.println("---------------- CHANGING DEVICE ----------------");
         if (f3d.getDeviceNames().size() > 1) {
-            System.out.println("---------------- CHANGING DEVICE ----------------");
             f3d.setDevice(1, mainWindow);
         }
+        else {
+            f3d.setDevice(0, mainWindow); // Testing purposes, should be changed to do nothing later
+        }
+
         while (!mainWindow.windowShouldClose() && !extra.windowShouldClose()) {
             mainWindow.pollEvents();
             extra.pollEvents();
