@@ -12,7 +12,7 @@ import static org.lwjgl.vulkan.VK10.*;
 public class Pipeline {
     private final Fuel3D renderer;
     private final Shader vertexShader, fragmentShader;
-    private long pipelineLayout, renderpass;
+    private long graphicsPipeline, pipelineLayout, renderpass;
     private final int targetImageFormat;
 
     public Pipeline(Shader vertexShader, Shader fragmentShader, Window target, Fuel3D renderer) {
@@ -27,20 +27,24 @@ public class Pipeline {
 
     protected void create() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
+            createRenderPass();
+
             LongBuffer lb = stack.mallocLong(1);
 
-            VkPipelineShaderStageCreateInfo vertShaderStageInfo = VkPipelineShaderStageCreateInfo.malloc(stack)
+            VkPipelineShaderStageCreateInfo.Buffer shaderStageInfo = VkPipelineShaderStageCreateInfo.malloc(2, stack)
                     .sType$Default()
                     .pNext(NULL)
                     .flags(0)
                     .stage(VK_SHADER_STAGE_VERTEX_BIT)
+                    .module(vertexShader.getShader())
                     .pName(stack.ASCII("main"))
                     .pSpecializationInfo(null);
-            VkPipelineShaderStageCreateInfo fragShaderStageInfo = VkPipelineShaderStageCreateInfo.malloc(stack)
+            (shaderStageInfo.get(1))
                     .sType$Default()
                     .pNext(NULL)
                     .flags(0)
                     .stage(VK_SHADER_STAGE_FRAGMENT_BIT)
+                    .module(fragmentShader.getShader())
                     .pName(stack.ASCII("main"))
                     .pSpecializationInfo(null);
             VkPipelineVertexInputStateCreateInfo vertexInputStateInfo = VkPipelineVertexInputStateCreateInfo.malloc(stack)
@@ -94,7 +98,7 @@ public class Pipeline {
                     .dstColorBlendFactor(VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA)
                     .colorBlendOp(VK_BLEND_OP_ADD)
                     .srcAlphaBlendFactor(VK_BLEND_FACTOR_ONE)
-                    .dstColorBlendFactor(VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA)
+                    .dstAlphaBlendFactor(VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA)
                     .alphaBlendOp(VK_BLEND_OP_ADD)
                     .colorWriteMask(
                             VK_COLOR_COMPONENT_A_BIT |
@@ -130,6 +134,27 @@ public class Pipeline {
             renderer.chErr(vkCreatePipelineLayout(renderer.getDevice(), pipelineLayoutInfo, null, lb));
             pipelineLayout = lb.get(0);
 
+            VkGraphicsPipelineCreateInfo.Buffer graphicsPipelineInfo = VkGraphicsPipelineCreateInfo.malloc(1, stack)
+                    .sType$Default()
+                    .pNext(NULL)
+                    .flags(0)
+                    .pStages(shaderStageInfo)
+                    .pVertexInputState(vertexInputStateInfo)
+                    .pInputAssemblyState(inputAssemblyStateInfo)
+                    .pTessellationState(null)
+                    .pViewportState(viewportStateInfo)
+                    .pRasterizationState(rasterizationStateInfo)
+                    .pMultisampleState(multisampleStateInfo)
+                    .pDepthStencilState(null)
+                    .pColorBlendState(colorBlendStateInfo)
+                    .pDynamicState(dynamicStateInfo)
+                    .layout(pipelineLayout)
+                    .renderPass(renderpass)
+                    .subpass(0)
+                    .basePipelineHandle(VK_NULL_HANDLE)
+                    .basePipelineIndex(-1); // TODO: make renderer create main pipeline and derive (?)
+            renderer.chErr(vkCreateGraphicsPipelines(renderer.getDevice(), VK_NULL_HANDLE, graphicsPipelineInfo, null, lb));
+            graphicsPipeline = lb.get(0);
         }
     }
 
@@ -153,6 +178,7 @@ public class Pipeline {
             VkSubpassDescription.Buffer subpassDescription = VkSubpassDescription.calloc(1, stack)
                     .flags(0) // TODO: Configurable number of subpasses (ex for deferred shading)
                     .pipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
+                    .colorAttachmentCount(1)
                     .pColorAttachments(colorAttachmentReference);
             VkRenderPassCreateInfo renderPassInfo = VkRenderPassCreateInfo.malloc(stack)
                     .sType$Default()
@@ -171,6 +197,7 @@ public class Pipeline {
     }
 
     protected void destroyObjects() {
+        vkDestroyPipeline(renderer.getDevice(), graphicsPipeline, null);
         vkDestroyPipelineLayout(renderer.getDevice(), pipelineLayout, null);
         vkDestroyRenderPass(renderer.getDevice(), renderpass, null);
     }
