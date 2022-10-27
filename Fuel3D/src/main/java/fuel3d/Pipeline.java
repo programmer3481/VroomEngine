@@ -165,7 +165,7 @@ public class Pipeline {
             VkAttachmentDescription.Buffer attachmentDescription = VkAttachmentDescription.malloc(1, stack)
                     .flags(0) // TODO: Configurable number of framebuffer attachments (render targets)
                     .format(targetImageFormat)
-                    .samples(VK_SAMPLE_COUNT_1_BIT)
+                    .samples(VK_SAMPLE_COUNT_1_BIT) //TODO: Multisample
                     .loadOp(VK_ATTACHMENT_LOAD_OP_CLEAR)
                     .storeOp(VK_ATTACHMENT_STORE_OP_STORE)
                     .stencilLoadOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE)
@@ -194,6 +194,7 @@ public class Pipeline {
 
     public boolean isWindowCompatible(Window window) {
         return window.getImageFormat() == targetImageFormat;
+        // TODO: (with multisampling) check sample count compatibility, support multiple attachments, subpasses, ...
     }
 
     protected void destroyObjects() {

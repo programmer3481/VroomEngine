@@ -20,7 +20,7 @@ public class Window {
     private long swapchain;
     private int swapchainImageFormat;
     private int width, height;
-    private ImageView[] swapchainImageViews;
+    private Image[] swapchainImages;
     private String title;
     private Fuel3D renderer;
     private final boolean vSync;
@@ -120,37 +120,8 @@ public class Window {
             LongBuffer swapchainImages = stack.mallocLong(ib.get(0));
             renderer.chErr(vkGetSwapchainImagesKHR(renderer.getDevice(), swapchain, ib, swapchainImages));
 
-            swapchainImageViews = createImageViews(swapchainImages, stack);
+            this.swapchainImages = Image.fromVkImages(swapchainImages, swapchainImageFormat, renderer);
         }
-    }
-
-    private ImageView[] createImageViews(LongBuffer images, MemoryStack stack) {
-        LongBuffer lb = stack.mallocLong(1);
-
-        ImageView[] result = new ImageView[images.capacity()];
-        for (int i = 0; i < images.capacity(); i++) {
-            VkImageViewCreateInfo imageViewInfo = VkImageViewCreateInfo.malloc(stack)
-                    .sType$Default()
-                    .pNext(NULL)
-                    .flags(0)
-                    .image(images.get(i))
-                    .viewType(VK_IMAGE_VIEW_TYPE_2D)
-                    .format(swapchainImageFormat)
-                    .components(vkComponentMapping -> vkComponentMapping
-                            .r(VK_COMPONENT_SWIZZLE_IDENTITY)
-                            .g(VK_COMPONENT_SWIZZLE_IDENTITY)
-                            .b(VK_COMPONENT_SWIZZLE_IDENTITY)
-                            .a(VK_COMPONENT_SWIZZLE_IDENTITY))
-                    .subresourceRange(vkImageSubresourceRange -> vkImageSubresourceRange
-                            .aspectMask(VK_IMAGE_ASPECT_COLOR_BIT)
-                            .baseMipLevel(0)
-                            .levelCount(1)
-                            .baseArrayLayer(0)
-                            .layerCount(1));
-            renderer.chErr(vkCreateImageView(renderer.getDevice(), imageViewInfo, null, lb));
-            result[i] = new ImageView(images.get(i), lb.get(0));
-        }
-        return result;
     }
 
     private VkSurfaceFormatKHR chooseSwapchainSurfaceFormat(SurfaceInfo info) {
@@ -229,8 +200,8 @@ public class Window {
     }
 
     protected void destroySwapchain() {
-        for (ImageView swapchainImageView : swapchainImageViews) {
-            vkDestroyImageView(renderer.getDevice(), swapchainImageView.imageview, null);
+        for (Image swapchainImage : swapchainImages) {
+            swapchainImage.destroy();
         }
         vkDestroySwapchainKHR(renderer.getDevice(), swapchain, null);
     }

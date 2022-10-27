@@ -37,9 +37,10 @@ public class Fuel3D {
     private final Debugger debugger;
     private final Logger logger;
 
-    private final  List<Window> windows = new ArrayList<>();
+    private final List<Window> windows = new ArrayList<>();
     private final List<Shader> shaders = new ArrayList<>();
     private final List<Pipeline> pipelines = new ArrayList<>();
+    private final List<Image> images = new ArrayList<>();
 
     private final boolean validate; // 'Debug mode'
     private final String appName, engineName;
@@ -254,6 +255,11 @@ public class Fuel3D {
 
     public void destroy() {
         logger.log(MessageType.INFO, "Cleaning up");
+        // destroy all images
+        for (Image image : images) {
+            image.destroy();
+        }
+
         // destroy all pipelines
         for (Pipeline pipeline : pipelines) {
             pipeline.destroyObjects();
@@ -473,6 +479,11 @@ public class Fuel3D {
         physicalDevice = physicalDevices.get(index);
         logger.log(MessageType.INFO, "Using GPU: " + deviceNameList.get(index));
 
+        // destroy all images
+        for (Image image : images) {
+            image.destroy();
+        }
+
         // destroy all pipelines
         for (Pipeline pipeline : pipelines) {
             pipeline.destroyObjects();
@@ -507,6 +518,11 @@ public class Fuel3D {
         for (Pipeline pipeline : pipelines) {
             pipeline.create();
         }
+
+        // recreate all images
+        for (Image image : images) {
+            image.create();
+        }
     }
 
     public Logger getLogger() {
@@ -537,12 +553,12 @@ public class Fuel3D {
         return engineVersion;
     }
 
-    protected VkInstance getInstance() {
+    protected VkInstance getInstance() { // used for surface creation/destruction
         return instance;
     }
 
     protected VkPhysicalDevice getPhysicalDevice() {
-        return physicalDevice;
+        return physicalDevice; // used for surface info query
     }
 
     protected VkDevice getDevice() {
@@ -575,6 +591,14 @@ public class Fuel3D {
 
     protected void removePipeline(Pipeline pipeline) {
         pipelines.remove(pipeline);
+    }
+
+    protected void addImage(Image image) {
+        images.remove(image);
+    }
+
+    protected void removeImage(Image image) {
+        images.remove(image);
     }
 
     //endregion
