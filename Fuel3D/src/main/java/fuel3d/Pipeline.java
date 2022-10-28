@@ -192,8 +192,8 @@ public class Pipeline {
         }
     }
 
-    public boolean isWindowCompatible(Window window) {
-        return window.getImageFormat() == targetImageFormat;
+    public boolean isFramebufferCompatible(Framebuffer framebuffer) {
+        return framebuffer.getImageFormat() == targetImageFormat;
         // TODO: (with multisampling) check sample count compatibility, support multiple attachments, subpasses, ...
     }
 
@@ -206,6 +206,10 @@ public class Pipeline {
     public void destroy() {
         destroyObjects();
         renderer.removePipeline(this);
+    }
+
+    protected long getRenderpass() {
+        return renderpass;
     }
 
 }

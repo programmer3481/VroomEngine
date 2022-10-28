@@ -14,7 +14,7 @@ import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
 import static org.lwjgl.system.MemoryUtil.*;
 
-public class Window {
+public class Window { // Contains the glfw window, the surface, and the swapchain. The only class that utilizes getInstance() and getPhysicalDevice().
     private long window;
     private long surface;
     private long swapchain;
@@ -120,7 +120,7 @@ public class Window {
             LongBuffer swapchainImages = stack.mallocLong(ib.get(0));
             renderer.chErr(vkGetSwapchainImagesKHR(renderer.getDevice(), swapchain, ib, swapchainImages));
 
-            this.swapchainImages = Image.fromVkImages(swapchainImages, swapchainImageFormat, renderer);
+            this.swapchainImages = Image.fromVkImages(swapchainImages, swapchainImageFormat, width, height, renderer);
         }
     }
 
@@ -268,7 +268,9 @@ public class Window {
         return vSync;
     }
 
-    private record ImageView(long image, long imageview) {}
+    protected Image[] getSwapchainImages() {
+        return swapchainImages;
+    }
 
     protected record SurfaceInfo(VkSurfaceCapabilitiesKHR capabilities, VkSurfaceFormatKHR.Buffer formats, IntBuffer presentModes) {
         public boolean available() {

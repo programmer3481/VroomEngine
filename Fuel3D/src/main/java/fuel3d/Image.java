@@ -10,18 +10,19 @@ import static org.lwjgl.vulkan.VK10.*;
 
 public class Image {
     private final Fuel3D renderer;
-    private final long image;
-    private long imageView;
+    private  long image, imageView;
     private final int imageFormat;
     private final boolean userCreated;
+    private final int width, height;
     // data = null if not userCreated
 
-    private Image(long image, int imageFormat, boolean userCreated, Fuel3D renderer) {
+    protected Image(long image, int imageFormat, int width, int height, Fuel3D renderer) {
         this.image = image;
         this.imageFormat = imageFormat;
-        this.userCreated = userCreated;
+        this.userCreated = false;
+        this.width = width;
+        this.height = height;
         this.renderer = renderer;
-        if (userCreated) renderer.addImage(this);
 
         create();
     }
@@ -55,7 +56,7 @@ public class Image {
 
     public void destroy() {
         destroyObjects();
-        renderer.removeImage(this);
+        if (userCreated) renderer.removeImage(this);
     }
 
     public void destroyObjects() {
@@ -65,11 +66,27 @@ public class Image {
         }
     }
 
-    protected static Image[] fromVkImages(LongBuffer images, int format, Fuel3D renderer) {
+    protected static Image[] fromVkImages(LongBuffer images, int format, int width, int height, Fuel3D renderer) {
         Image[] result = new Image[images.capacity()];
         for (int i = 0; i < images.capacity(); i++) {
-            result[i] = new Image(images.get(i), format, false, renderer);
+            result[i] = new Image(images.get(i), format, width, height,  renderer);
         }
         return result;
+    }
+
+    protected int getImageFormat() {
+        return imageFormat;
+    }
+
+    protected long getImageView() {
+        return imageView;
+    }
+
+    public int getWidth() {
+        return width;
+    }
+
+    public int getHeight() {
+        return height;
     }
 }

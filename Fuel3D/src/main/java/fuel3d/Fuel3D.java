@@ -22,7 +22,7 @@ import static org.lwjgl.vulkan.EXTDebugUtils.*;
 import static org.lwjgl.glfw.GLFWVulkan.*;
 import static fuel3d.Logger.MessageType;
 
-public class Fuel3D {
+public class Fuel3D { // Contains the instance, logical and physical device, and command buffers
     private final VkInstance instance;
     private VkPhysicalDevice physicalDevice = null;
     private List<String> deviceNameList;
@@ -41,6 +41,7 @@ public class Fuel3D {
     private final List<Shader> shaders = new ArrayList<>();
     private final List<Pipeline> pipelines = new ArrayList<>();
     private final List<Image> images = new ArrayList<>();
+    private final List<Framebuffer> framebuffers = new ArrayList<>();
 
     private final boolean validate; // 'Debug mode'
     private final String appName, engineName;
@@ -255,10 +256,16 @@ public class Fuel3D {
 
     public void destroy() {
         logger.log(MessageType.INFO, "Cleaning up");
+        for (Framebuffer framebuffer: framebuffers) {
+            framebuffer.destroyObjects();
+        }
+        framebuffers.clear();
+
         // destroy all images
         for (Image image : images) {
-            image.destroy();
+            image.destroyObjects();
         }
+        images.clear();
 
         // destroy all pipelines
         for (Pipeline pipeline : pipelines) {
@@ -475,6 +482,7 @@ public class Fuel3D {
         return deviceNameList;
     }
 
+    /* // TODO: reimplement it properly!!
     public void setDevice(int index, Window testWindow) {
         physicalDevice = physicalDevices.get(index);
         logger.log(MessageType.INFO, "Using GPU: " + deviceNameList.get(index));
@@ -524,6 +532,7 @@ public class Fuel3D {
             image.create();
         }
     }
+    */
 
     public Logger getLogger() {
         return logger;
