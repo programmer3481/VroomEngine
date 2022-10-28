@@ -19,6 +19,7 @@ public class Framebuffer {
         this.image = image; // TODO: multiple image attachments
         this.targetPipeline = targetPipeline;
         this.renderer = renderer;
+        renderer.addFramebuffer(this);
 
         create();
     }
@@ -48,17 +49,41 @@ public class Framebuffer {
 
     private void destroy() {
         destroyObjects();
+        renderer.removeFramebuffer(this);
     }
 
-    protected int getImageFormat() {
-        return image.getImageFormat();
+    protected long getFramebuffer() {
+        return framebuffer;
     }
 
-    public static Framebuffer[] getFromWindow(Window window, Pipeline targetPipeline, Fuel3D renderer) {
-        Framebuffer[] result = new Framebuffer[window.getSwapchainImages().length];
-        for (int i = 0; i < window.getSwapchainImages().length; i++) {
-            result[i] = new Framebuffer(window.getSwapchainImages()[i], targetPipeline, renderer);
+    protected Image getImage() {
+        return image;
+    }
+
+    public static class WindowFramebuffer {
+        private final Framebuffer[] framebuffers;
+        private final Window window;
+
+        public WindowFramebuffer(Window window, Pipeline targetPipeline, Fuel3D renderer) {
+            this.window = window;
+            framebuffers = new Framebuffer[window.getSwapchainImages().length];
+            for (int i = 0; i < window.getSwapchainImages().length; i++) {
+                framebuffers[i] = new Framebuffer(window.getSwapchainImages()[i], targetPipeline, renderer);
+            }
         }
-        return result;
+
+        public void destroy() {
+            for (Framebuffer framebuffer : framebuffers) {
+                framebuffer.destroy();
+            }
+        }
+
+        protected Framebuffer[] getFramebuffers() {
+            return framebuffers;
+        }
+
+        public Window getWindow() {
+            return window;
+        }
     }
 }

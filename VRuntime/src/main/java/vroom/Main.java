@@ -2,12 +2,10 @@ package vroom;
 
 import com.sun.jna.Native;
 import com.sun.jna.platform.win32.Kernel32;
-import com.sun.jna.platform.win32.WinDef;
 import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.platform.win32.Wincon;
 import com.sun.jna.ptr.IntByReference;
 import fuel3d.*;
-import org.lwjgl.vulkan.VkDebugMarkerObjectNameInfoEXT;
 
 import java.io.IOException;
 
@@ -23,7 +21,6 @@ public class Main {
             dwMode.setValue(dwMode.getValue() | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
             wincon.SetConsoleMode(hOut, dwMode.getValue());
         }
-
 
         Fuel3D.init();
 
@@ -54,10 +51,10 @@ public class Main {
         f3dSettings.enableDebug(debugger);
         f3dSettings.logger = logger;
 
-        Window mainWindow = new Window(1920, 1080, "hi", null);
+        Window mainWindow = new Window(1920, 1080, "hi", null, true);
         Fuel3D f3d = new Fuel3D(f3dSettings, mainWindow);
 
-        Window extra = new Window(1280, 720, "Multiple windows go brrr", f3d);
+        //Window extra = new Window(1280, 720, "Multiple windows go brrr", f3d);
 
 
         Shader vertShader = Shader.fromGLSLFile("C:/Users/gwch3/IdeaProjects/VroomEngine/VRuntime/src/main/resources/shaders/vert.glsl",
@@ -67,20 +64,15 @@ public class Main {
 
         Pipeline pipeline = new Pipeline(vertShader, fragShader, mainWindow, f3d);
 
+        Framebuffer.WindowFramebuffer framebuffer = new Framebuffer.WindowFramebuffer(mainWindow, pipeline, f3d);
+
         mainWindow.visible(true);
-        extra.visible(true);
+        //extra.visible(true);
 
-        System.out.println("---------------- CHANGING DEVICE ----------------");
-        if (f3d.getDeviceNames().size() > 1) {
-            f3d.setDevice(1, mainWindow);
-        }
-        else {
-            f3d.setDevice(0, mainWindow); // Testing purposes, should be changed to do nothing later
-        }
-
-        while (!mainWindow.windowShouldClose() && !extra.windowShouldClose()) {
+        while (!mainWindow.windowShouldClose()) {// && !extra.windowShouldClose()) {
             mainWindow.pollEvents();
-            extra.pollEvents();
+            f3d.render(framebuffer, pipeline);
+            //extra.pollEvents();
         }
 
         f3d.destroy();

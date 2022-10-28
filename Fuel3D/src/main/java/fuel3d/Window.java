@@ -243,6 +243,10 @@ public class Window { // Contains the glfw window, the surface, and the swapchai
         return surface;
     }
 
+    protected long getSwapchain() {
+        return swapchain;
+    }
+
     protected int getImageFormat() {
         return swapchainImageFormat;
     }

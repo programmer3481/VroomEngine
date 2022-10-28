@@ -101,7 +101,7 @@ public class Pipeline {
                     .dstAlphaBlendFactor(VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA)
                     .alphaBlendOp(VK_BLEND_OP_ADD)
                     .colorWriteMask(
-                            VK_COLOR_COMPONENT_A_BIT |
+                            VK_COLOR_COMPONENT_R_BIT |
                             VK_COLOR_COMPONENT_G_BIT |
                             VK_COLOR_COMPONENT_B_BIT |
                             VK_COLOR_COMPONENT_A_BIT);
@@ -180,20 +180,28 @@ public class Pipeline {
                     .pipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
                     .colorAttachmentCount(1)
                     .pColorAttachments(colorAttachmentReference);
+            VkSubpassDependency.Buffer subpassDependency = VkSubpassDependency.malloc(1, stack)
+                    .srcSubpass(VK_SUBPASS_EXTERNAL)
+                    .dstSubpass(0)
+                    .srcStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                    .dstStageMask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                    .srcAccessMask(0)
+                    .dstAccessMask(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
+                    .dependencyFlags(0);
             VkRenderPassCreateInfo renderPassInfo = VkRenderPassCreateInfo.malloc(stack)
                     .sType$Default()
                     .pNext(NULL)
                     .flags(0)
                     .pAttachments(attachmentDescription)
                     .pSubpasses(subpassDescription)
-                    .pDependencies(null);
+                    .pDependencies(subpassDependency);
             renderer.chErr(vkCreateRenderPass(renderer.getDevice(), renderPassInfo, null, lb));
             renderpass = lb.get(0);
         }
     }
 
     public boolean isFramebufferCompatible(Framebuffer framebuffer) {
-        return framebuffer.getImageFormat() == targetImageFormat;
+        return framebuffer.getImage().getImageFormat() == targetImageFormat;
         // TODO: (with multisampling) check sample count compatibility, support multiple attachments, subpasses, ...
     }
 
@@ -210,6 +218,10 @@ public class Pipeline {
 
     protected long getRenderpass() {
         return renderpass;
+    }
+
+    protected long getPipeline() {
+        return graphicsPipeline;
     }
 
 }
