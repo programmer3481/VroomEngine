@@ -259,7 +259,7 @@ public class Fuel3D { // Contains the instance, logical and physical device, and
     }
 
     public void destroy() {
-        vkWaitForFences(device, inFlightFence, true, Long.MAX_VALUE);
+        vkDeviceWaitIdle(device);
         vkDestroySemaphore(device, renderFinishedSemaphore, null);
         vkDestroySemaphore(device, imageAvailableSemaphore, null);
         vkDestroyFence(device, inFlightFence, null);
