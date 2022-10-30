@@ -400,12 +400,15 @@ public class Fuel3D { // Contains the instance, logical and physical device, and
                 chErr(vkEnumeratePhysicalDevices(instance, ib, availablePhysicalDevices));
 
                 VkPhysicalDeviceProperties.Buffer availablePhysicalDevicesProperties = VkPhysicalDeviceProperties.malloc(ib.get(0), stack);
+                VkPhysicalDeviceFeatures.Buffer availablePhysicalDevicesFeatures = VkPhysicalDeviceFeatures.malloc(ib.get(0), stack);
                 physicalDevices = new ArrayList<>(ib.get(0));
                 deviceNameList = new ArrayList<>(ib.get(0));
 
                 for (int i = 0; i < availablePhysicalDevices.capacity(); i++) {
                     VkPhysicalDevice testDevice = new VkPhysicalDevice(availablePhysicalDevices.get(i), instance);
                     vkGetPhysicalDeviceProperties(testDevice, availablePhysicalDevicesProperties.get(i));
+                    vkGetPhysicalDeviceFeatures(testDevice, availablePhysicalDevicesFeatures.get(i));
+                    // TODO: integrated/dedicated gpu selection
 
                     if (isDeviceSupported(testDevice, availablePhysicalDevicesProperties.get(i), testWindow)) {
                         physicalDevices.add(testDevice);
@@ -541,7 +544,7 @@ public class Fuel3D { // Contains the instance, logical and physical device, and
             VkCommandBufferBeginInfo commandBufferBeginInfo = VkCommandBufferBeginInfo.malloc(stack)
                     .sType$Default()
                     .pNext(NULL)
-                    .flags(0)
+                    .flags(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT)
                     .pInheritanceInfo(null);
             chErr(vkBeginCommandBuffer(commandBuffer, commandBufferBeginInfo));
 
