@@ -39,7 +39,7 @@ public class Main {
                 case ERROR -> type = " \033[31mERROR:\033[1m";
                 case MISC -> type = "";
             }
-            System.err.format("[\033[32m\033[1mFuel3D\033[0m]%s %s\033[0m", type, message);
+            System.out.format("[\033[32m\033[1mFuel3D\033[0m]%s %s\033[0m", type, message);
             System.out.println();
         };
         loggerSettings.errorString =
@@ -48,14 +48,11 @@ public class Main {
         Logger logger = new Logger(loggerSettings);
 
         Fuel3D.Settings f3dSettings = new Fuel3D.Settings();
-        f3dSettings.enableDebug(debugger);
+        //f3dSettings.enableDebug(debugger);
         f3dSettings.logger = logger;
 
-        Window mainWindow = new Window(1920, 1080, "hi", null, false);
+        Window mainWindow = new Window(1920, 1080, "hi", null, true);
         Fuel3D f3d = new Fuel3D(f3dSettings, mainWindow);
-
-        Window extra = new Window(1280, 720, "Multiple windows go brrr", f3d, false);
-
 
         Shader vertShader = Shader.fromGLSLFile("C:/Users/gwch3/IdeaProjects/VroomEngine/VRuntime/src/main/resources/shaders/vert.glsl",
                 Shader.ShaderType.VertexShader, f3d);
@@ -64,15 +61,27 @@ public class Main {
 
         Pipeline pipeline = new Pipeline(vertShader, fragShader, mainWindow, f3d);
 
-        Framebuffer.WindowFramebuffer framebuffer = new Framebuffer.WindowFramebuffer(extra, pipeline, f3d);
+        WindowFramebuffer framebuffer = new WindowFramebuffer(mainWindow, pipeline, f3d);
 
         mainWindow.visible(true);
-        extra.visible(true);
 
-        while (!mainWindow.windowShouldClose() && !extra.windowShouldClose()) {
+        int frameCount = 0;
+        long countStart = System.nanoTime();
+        while (!mainWindow.windowShouldClose()) {
+            frameCount++;
+
             mainWindow.pollEvents();
-            f3d.render(framebuffer, pipeline);
-            extra.pollEvents();
+            int frame = f3d.nextFrame();
+            try (CmdRecorder recorder = f3d.recordWith(framebuffer, pipeline)) {
+                recorder.drawVertices(3);
+            }
+            f3d.endFrame();
+            f3d.enqueueFrame(frame);
+            if ((System.nanoTime() - countStart) >= 1000*1000*1000) {
+                mainWindow.setTitle("hi | FPS: " + frameCount);
+                countStart = System.nanoTime();
+                frameCount = 0;
+            }
         }
 
         f3d.destroy();

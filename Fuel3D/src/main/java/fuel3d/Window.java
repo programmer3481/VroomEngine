@@ -111,7 +111,10 @@ public class Window { // Contains the glfw window, the surface, and the swapchai
                         .pQueueFamilyIndices(stack.ints(renderer.getQueueIndices().graphics(), renderer.getQueueIndices().present()));
             }
             else {
-                swapchainInfo.imageSharingMode(VK_SHARING_MODE_EXCLUSIVE);
+                swapchainInfo
+                        .imageSharingMode(VK_SHARING_MODE_EXCLUSIVE)
+                        .queueFamilyIndexCount(0)
+                        .pQueueFamilyIndices(null);
             }
             renderer.chErr(vkCreateSwapchainKHR(renderer.getDevice(), swapchainInfo, null, lb));
             swapchain = lb.get(0);

@@ -47,7 +47,7 @@ public class Framebuffer {
         vkDestroyFramebuffer(renderer.getDevice(), framebuffer, null);
     }
 
-    private void destroy() {
+    public void destroy() {
         destroyObjects();
         renderer.removeFramebuffer(this);
     }
@@ -60,30 +60,4 @@ public class Framebuffer {
         return image;
     }
 
-    public static class WindowFramebuffer {
-        private final Framebuffer[] framebuffers;
-        private final Window window;
-
-        public WindowFramebuffer(Window window, Pipeline targetPipeline, Fuel3D renderer) {
-            this.window = window;
-            framebuffers = new Framebuffer[window.getSwapchainImages().length];
-            for (int i = 0; i < window.getSwapchainImages().length; i++) {
-                framebuffers[i] = new Framebuffer(window.getSwapchainImages()[i], targetPipeline, renderer);
-            }
-        }
-
-        public void destroy() {
-            for (Framebuffer framebuffer : framebuffers) {
-                framebuffer.destroy();
-            }
-        }
-
-        protected Framebuffer[] getFramebuffers() {
-            return framebuffers;
-        }
-
-        public Window getWindow() {
-            return window;
-        }
-    }
 }

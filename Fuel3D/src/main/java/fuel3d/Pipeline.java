@@ -14,6 +14,7 @@ public class Pipeline {
     private final Shader vertexShader, fragmentShader;
     private long graphicsPipeline, pipelineLayout, renderpass;
     private final int targetImageFormat;
+    private final float[] clearColor = new float[4]; // TODO: make this setting
 
     public Pipeline(Shader vertexShader, Shader fragmentShader, Window target, Fuel3D renderer) {
         this.renderer = renderer;
@@ -203,6 +204,10 @@ public class Pipeline {
     public boolean isFramebufferCompatible(Framebuffer framebuffer) {
         return framebuffer.getImage().getImageFormat() == targetImageFormat;
         // TODO: (with multisampling) check sample count compatibility, support multiple attachments, subpasses, ...
+    }
+
+    public float[] getClearColor() {
+        return clearColor;
     }
 
     protected void destroyObjects() {

@@ -28,14 +28,18 @@ public class Fuel3D { // Contains the instance, logical and physical device, and
     private List<String> deviceNameList;
     private VkDevice device = null;
     private AvailableQueueFamilyIndices queueIndices;
-    private VkQueue graphicsQueue = null;
+    private VkQueue graphicsQueue = null; // TODO: separate compute queue
     private VkQueue presentQueue = null;
-    private long commandPool;
-    private VkCommandBuffer commandBuffer;
-    private long imageAvailableSemaphore, renderFinishedSemaphore, inFlightFence;
     private List<VkPhysicalDevice> physicalDevices;
     private long debugMessenger;
     private String platform;
+    private CmdRecorder cmdRecorder;
+
+    private long[] commandPools;
+    private VkCommandBuffer[] commandBuffers;
+    private long[] frameAvailableFences;
+    private long[] frameFinishedSemaphores;
+    private int frameIndex = 0;
 
     private final Debugger debugger;
     private final Logger logger;
@@ -45,7 +49,9 @@ public class Fuel3D { // Contains the instance, logical and physical device, and
     private final List<Pipeline> pipelines = new ArrayList<>();
     private final List<Image> images = new ArrayList<>();
     private final List<Framebuffer> framebuffers = new ArrayList<>();
+    private final List<WindowFramebuffer> windowFramebuffers = new ArrayList<>();
 
+    private final int frameCount = 2; // TODO: Make this enum setting
     private final boolean validate; // 'Debug mode'
     private final String appName, engineName;
     private final Version appVersion, engineVersion;
@@ -251,7 +257,7 @@ public class Fuel3D { // Contains the instance, logical and physical device, and
 
             pickPhysicalDevice(initWindow);
             createLogicalDevice(initWindow);
-            createCommandBuffer();
+            createCommandBuffers();
 
             initWindow.checkSupport();
             initWindow.createSwapChain();
@@ -259,14 +265,20 @@ public class Fuel3D { // Contains the instance, logical and physical device, and
     }
 
     public void destroy() {
-        vkDeviceWaitIdle(device);
-        vkDestroySemaphore(device, renderFinishedSemaphore, null);
-        vkDestroySemaphore(device, imageAvailableSemaphore, null);
-        vkDestroyFence(device, inFlightFence, null);
-
-        vkDestroyCommandPool(device, commandPool, null);
-
         logger.log(MessageType.INFO, "Cleaning up");
+
+        vkDeviceWaitIdle(device);
+        for (int frame = 0; frame < frameCount; frame++) {
+            vkDestroyFence(device, frameAvailableFences[frame], null);
+            vkDestroySemaphore(device, frameFinishedSemaphores[frame], null);
+            vkDestroyCommandPool(device, commandPools[frame], null);
+        }
+
+        for (WindowFramebuffer windowFramebuffer: windowFramebuffers) {
+            windowFramebuffer.destroyObjects();
+        }
+        windowFramebuffers.clear();
+
         for (Framebuffer framebuffer: framebuffers) {
             framebuffer.destroyObjects();
         }
@@ -290,7 +302,7 @@ public class Fuel3D { // Contains the instance, logical and physical device, and
         }
         shaders.clear();
 
-        // destroy all windows' swap chains
+        // destroy all windows
         for (Window window : windows) {
             window.destroyObjects();
         }
@@ -303,27 +315,21 @@ public class Fuel3D { // Contains the instance, logical and physical device, and
         vkDestroyInstance(instance, null);
     }
 
-    private void createCommandBuffer() {
+    private void createCommandBuffers() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             LongBuffer lb = stack.mallocLong(1);
             PointerBuffer pb = stack.mallocPointer(1);
+            frameAvailableFences = new long[frameCount];
+            frameFinishedSemaphores = new long[frameCount];
+            commandPools = new long[frameCount];
+            commandBuffers = new VkCommandBuffer[frameCount];
 
             VkCommandPoolCreateInfo commandPoolInfo = VkCommandPoolCreateInfo.malloc(stack)
                     .sType$Default()
                     .pNext(NULL)
-                    .flags(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT)
+                    .flags(0)
                     .queueFamilyIndex(queueIndices.graphics);
-            chErr(vkCreateCommandPool(device, commandPoolInfo, null, lb));
-            commandPool = lb.get(0);
 
-            VkCommandBufferAllocateInfo commandBufferInfo = VkCommandBufferAllocateInfo.malloc(stack)
-                    .sType$Default()
-                    .pNext(NULL)
-                    .commandPool(commandPool)
-                    .level(VK_COMMAND_BUFFER_LEVEL_PRIMARY)
-                    .commandBufferCount(1);
-            chErr(vkAllocateCommandBuffers(device, commandBufferInfo, pb));
-            commandBuffer = new VkCommandBuffer(pb.get(0), device);
 
             VkSemaphoreCreateInfo semaphoreInfo = VkSemaphoreCreateInfo.malloc(stack)
                     .sType$Default()
@@ -333,12 +339,25 @@ public class Fuel3D { // Contains the instance, logical and physical device, and
                     .sType$Default()
                     .pNext(NULL)
                     .flags(VK_FENCE_CREATE_SIGNALED_BIT);
-            chErr(vkCreateSemaphore(device, semaphoreInfo,null, lb));
-            imageAvailableSemaphore = lb.get(0);
-            chErr(vkCreateSemaphore(device, semaphoreInfo,null, lb));
-            renderFinishedSemaphore = lb.get(0);
-            chErr(vkCreateFence(device, fenceInfo, null, lb));
-            inFlightFence = lb.get(0);
+            for (int frame = 0; frame < frameCount; frame++) {
+                chErr(vkCreateCommandPool(device, commandPoolInfo, null, lb));
+                commandPools[frame] = lb.get(0);
+                VkCommandBufferAllocateInfo commandBufferInfo = VkCommandBufferAllocateInfo.malloc(stack)
+                        .sType$Default()
+                        .pNext(NULL)
+                        .commandPool(commandPools[frame])
+                        .level(VK_COMMAND_BUFFER_LEVEL_PRIMARY)
+                        .commandBufferCount(1);
+                chErr(vkAllocateCommandBuffers(device, commandBufferInfo, pb));
+                commandBuffers[frame] = new VkCommandBuffer(pb.get(0), device);
+
+                chErr(vkCreateFence(device, fenceInfo, null, lb));
+                frameAvailableFences[frame] = lb.get(0);
+                chErr(vkCreateSemaphore(device, semaphoreInfo, null, lb));
+                frameFinishedSemaphores[frame] = lb.get(0);
+            }
+
+            cmdRecorder = new CmdRecorder();
         }
     }
 
@@ -529,93 +548,69 @@ public class Fuel3D { // Contains the instance, logical and physical device, and
         if (code != 0 && code != 5) logger.error(String.format("Vulkan error [0x%X]", code));
     }
 
-    public void render(Framebuffer.WindowFramebuffer framebuffer, Pipeline pipeline) {
+    public int nextFrame() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            IntBuffer ib = stack.mallocInt(1);
+            frameIndex = (frameIndex + 1) % frameCount;
+            vkWaitForFences(device, frameAvailableFences[frameIndex], true, Long.MAX_VALUE);
+            vkResetFences(device, frameAvailableFences[frameIndex]);
 
-            vkWaitForFences(device, inFlightFence, true, Long.MAX_VALUE);
-            vkResetFences(device, inFlightFence);
-
-            vkAcquireNextImageKHR(device, framebuffer.getWindow().getSwapchain(), Long.MAX_VALUE, imageAvailableSemaphore, VK_NULL_HANDLE, ib);
-            int imageIndex = ib.get(0);
-
-            // region record commandBuffer
-            vkResetCommandBuffer(commandBuffer, 0);
+            vkResetCommandPool(device, commandPools[frameIndex], 0);
             VkCommandBufferBeginInfo commandBufferBeginInfo = VkCommandBufferBeginInfo.malloc(stack)
                     .sType$Default()
                     .pNext(NULL)
                     .flags(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT)
                     .pInheritanceInfo(null);
-            chErr(vkBeginCommandBuffer(commandBuffer, commandBufferBeginInfo));
+            chErr(vkBeginCommandBuffer(commandBuffers[frameIndex], commandBufferBeginInfo));
 
-            VkClearValue.Buffer clearValues = VkClearValue.malloc(1, stack);
-            clearValues.color()
-                    .float32(0, 0.0f)
-                    .float32(1, 0.0f)
-                    .float32(2, 0.0f)
-                    .float32(3, 1.0f);
+            return frameIndex;
+        }
+    }
 
-            VkRenderPassBeginInfo renderPassBeginInfo = VkRenderPassBeginInfo.malloc(stack)
-                    .sType$Default()
-                    .pNext(NULL)
-                    .renderPass(pipeline.getRenderpass())
-                    .framebuffer(framebuffer.getFramebuffers()[imageIndex].getFramebuffer())
-                    .renderArea(vkRect2D -> vkRect2D
-                            .offset(vkOffset2D -> vkOffset2D.set(0, 0))
-                            .extent(vkExtent2D -> vkExtent2D.set(
-                                    framebuffer.getFramebuffers()[imageIndex].getImage().getWidth(),
-                                    framebuffer.getFramebuffers()[imageIndex].getImage().getHeight())))
-                    .clearValueCount(1)
-                    .pClearValues(clearValues);
-            vkCmdBeginRenderPass(commandBuffer, renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.getPipeline());
+    public void endFrame() {
+        chErr(vkEndCommandBuffer(commandBuffers[frameIndex]));
+    }
 
-            VkViewport.Buffer viewport = VkViewport.malloc(1, stack)
-                    .x(0.0f)
-                    .y(0.0f)
-                    .width(framebuffer.getFramebuffers()[imageIndex].getImage().getWidth())
-                    .height(framebuffer.getFramebuffers()[imageIndex].getImage().getHeight())
-                    .minDepth(0.0f)
-                    .maxDepth(1.0f);
-            vkCmdSetViewport(commandBuffer, 0, viewport);
+    public CmdRecorder recordWith(WindowFramebuffer framebuffer, Pipeline pipeline) {
+        cmdRecorder.start(commandBuffers[frameIndex], framebuffer.getFramebuffers()[framebuffer.requestNextImage()], pipeline);
+        return cmdRecorder;
+    }
 
-            VkRect2D.Buffer scissor = VkRect2D.malloc(1, stack)
-                    .offset(vkOffset2D -> vkOffset2D.set(0, 0))
-                    .extent(vkExtent2D -> vkExtent2D.set(
-                            framebuffer.getFramebuffers()[imageIndex].getImage().getWidth(),
-                            framebuffer.getFramebuffers()[imageIndex].getImage().getHeight()));
-            vkCmdSetScissor(commandBuffer, 0, scissor);
-
-            vkCmdDraw(commandBuffer, 3, 1, 0, 0); // TODO: VERTEX BUFFERS
-
-            vkCmdEndRenderPass(commandBuffer);
-            chErr(vkEndCommandBuffer(commandBuffer));
-            //endregion
+    public void enqueueFrame(int frame) {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            LongBuffer imageAvailableSemaphores = stack.mallocLong(windowFramebuffers.size());
+            for (WindowFramebuffer windowFramebuffer : windowFramebuffers) {
+                if (windowFramebuffer.isNextImageRequested()) {
+                    imageAvailableSemaphores.put(windowFramebuffer.getImageAcquisitionSemaphore());
+                }
+            }
+            imageAvailableSemaphores.flip();
 
             VkSubmitInfo submitInfo = VkSubmitInfo.malloc(stack)
                     .sType$Default()
                     .pNext(NULL)
-                    .waitSemaphoreCount(1)
-                    .pWaitSemaphores(stack.longs(imageAvailableSemaphore))
+                    .waitSemaphoreCount(imageAvailableSemaphores.remaining())
+                    .pWaitSemaphores(imageAvailableSemaphores)
                     .pWaitDstStageMask(stack.ints(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)) // TODO: more attachments
-                    .pCommandBuffers(stack.pointers(commandBuffer))
-                    .pSignalSemaphores(stack.longs(renderFinishedSemaphore));
-            chErr(vkQueueSubmit(graphicsQueue, submitInfo, inFlightFence));
+                    .pCommandBuffers(stack.pointers(commandBuffers[frame]))
+                    .pSignalSemaphores(stack.longs(frameFinishedSemaphores[frame]));
+            chErr(vkQueueSubmit(graphicsQueue, submitInfo, frameAvailableFences[frame]));
 
-            //region presentation
-            VkPresentInfoKHR presentInfo = VkPresentInfoKHR.malloc(stack)
-                    .sType$Default()
-                    .pNext(NULL)
-                    .pWaitSemaphores(stack.longs(renderFinishedSemaphore))
-                    .swapchainCount(1)
-                    .pSwapchains(stack.longs(framebuffer.getWindow().getSwapchain()))
-                    .pImageIndices(stack.ints(imageIndex))
-                    .pResults(null);
-            vkQueuePresentKHR(presentQueue, presentInfo);
-            //endregion presentation
+            for (WindowFramebuffer windowFramebuffer : windowFramebuffers) {
+                if (windowFramebuffer.isNextImageRequested()) {
+                    VkPresentInfoKHR presentInfo = VkPresentInfoKHR.malloc(stack)
+                            .sType$Default()
+                            .pNext(NULL)
+                            .pWaitSemaphores(stack.longs(frameFinishedSemaphores[frame]))
+                            .swapchainCount(1)
+                            .pSwapchains(stack.longs(windowFramebuffer.getWindow().getSwapchain()))
+                            .pImageIndices(stack.ints(windowFramebuffer.getImageIndex()))
+                            .pResults(null);
+                    vkQueuePresentKHR(presentQueue, presentInfo);
+                    windowFramebuffer.nextImageUsed();
+                }
+            }
         }
     }
-
 
     //region getters and setters
     public List<String> getDeviceNames() {
@@ -758,6 +753,13 @@ public class Fuel3D { // Contains the instance, logical and physical device, and
         framebuffers.remove(framebuffer);
     }
 
+    protected void addWindowFramebuffer(WindowFramebuffer windowFramebuffer) {
+        windowFramebuffers.add(windowFramebuffer);
+    }
+
+    protected void removeWindowFramebuffer(WindowFramebuffer windowFramebuffer) {
+        windowFramebuffers.add(windowFramebuffer);
+    }
     //endregion
 
     //region init and cleanup
